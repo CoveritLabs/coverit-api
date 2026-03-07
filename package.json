@@ -10,7 +10,8 @@
         "start": "node dist/index.js",
         "lint": "eslint .",
         "commit": "cz",
-        "prepare": "husky"
+        "prepare": "husky",
+        "docker": "sh docker.sh"
     },
     "config": {
         "commitizen": {
