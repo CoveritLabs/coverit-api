@@ -1,0 +1,14 @@
+# Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+# Proprietary and confidential. Unauthorized use is strictly prohibited.
+# See LICENSE file in the project root for full license information.
+
+services:
+  api:
+    image: ghcr.io/coveritlabs/coverit-api:${API_TAG:-dev}
+    container_name: coverit-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+    restart: unless-stopped
