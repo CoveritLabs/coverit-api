@@ -7,6 +7,15 @@
         ],
         "outDir": "./dist",
         "rootDir": "./src",
+        "baseUrl": "./src",
+        "paths": {
+            "@api/*": ["api/*"],
+            "@config/*": ["config/*"],
+            "@lib/*": ["lib/*"],
+            "@services/*": ["services/*"],
+            "@utils/*": ["utils/*"],
+            "@generated/*": ["generated/*"]
+        },
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
