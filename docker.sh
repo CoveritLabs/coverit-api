@@ -4,60 +4,62 @@
 # Proprietary and confidential. Unauthorized use is strictly prohibited.
 # See LICENSE file in the project root for full license information.
 
+
+# Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+# Proprietary and confidential. Unauthorized use is strictly prohibited.
+# See LICENSE file in the project root for full license information.
+
 # Usage:
-#   ./docker.sh up                   → start with :dev (default)
-#   ./docker.sh up --tag latest      → start with :latest
-#   ./docker.sh up --tag 1.2.3       → start with specific version
-#   ./docker.sh up --local           → build from local source
-#   ./docker.sh down                 → stop all services
-#   ./docker.sh logs                 → tail logs
+#   ./docker.sh up                   → remote image + cloud db/redis
+#   ./docker.sh up --local           → local dev build + hot-reload + local db/redis
+#   ./docker.sh up --test-prod       → local prod build + cloud db/redis
+#   ./docker.sh up --tag latest      → remote image (specific tag) + cloud db/redis
 
 print_help() {
-  echo "Usage: $0 [up|down|logs] [--tag <tag>] [--local]"
-  echo
-  echo "Commands:"
-  echo "  up       Start services (default tag: dev)"
-  echo "  down     Stop all services"
-  echo "  logs     Tail logs of all services"
-  echo
-  echo "Options:"
-  echo "  --tag <tag>   Specify API image tag (default: dev)"
-  echo "  --local       Build API image from local source"
+  echo "Usage: $0 [up|down|logs] [--tag <tag>] [--local] [--test-prod]"
 }
-
 
 set -e
 
 CMD="${1:-up}"
 shift 2>/dev/null || true
 
-TAG="dev"
+# Defaults
+export API_TAG="dev"
 LOCAL=false
+TEST_PROD=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --tag)  TAG="$2"; shift 2 ;;
+    --tag) export API_TAG="$2"; shift 2 ;;
     --local) LOCAL=true; shift ;;
+    --test-prod) TEST_PROD=true; shift ;;
     -h|--help) print_help; exit 0 ;;
     *) echo "Unknown flag: $1"; exit 1 ;;
   esac
 done
 
+# Only --local uses local db/redis. Everything else connects to cloud.
+if [ "$LOCAL" = true ]; then
+  echo "Starting API in local dev mode (local db + redis)..."
+  EXEC_CMD="docker compose -f docker-compose.yml -f overrides/api.dev.yml"
+elif [ "$TEST_PROD" = true ]; then
+  echo "Starting API in Production Test mode (local prod build + cloud)..."
+  EXEC_CMD="docker compose -f docker-compose.yml -f overrides/api.cloud.yml -f overrides/api.test.yml"
+else
+  echo "Starting API using remote image (API_TAG=$API_TAG) + cloud..."
+  EXEC_CMD="docker compose -f docker-compose.yml -f overrides/api.cloud.yml"
+fi
+
 case "$CMD" in
   up)
-    if [ "$LOCAL" = true ]; then
-      echo "Starting services (local build)..."
-      docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-    else
-      echo "Starting services (API_TAG=$TAG)..."
-      API_TAG="$TAG" docker compose up -d
-    fi
+    $EXEC_CMD up -d --build
     ;;
   down)
-    docker compose down
+    $EXEC_CMD down
     ;;
   logs)
-    docker compose logs -f
+    $EXEC_CMD logs -f
     ;;
   *)
     echo "Unknown command: $CMD"

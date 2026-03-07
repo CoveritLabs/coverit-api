@@ -2,6 +2,8 @@
 # Proprietary and confidential. Unauthorized use is strictly prohibited.
 # See LICENSE file in the project root for full license information.
 
+name: coverit
+
 services:
   api:
     image: ghcr.io/coveritlabs/coverit-api:${API_TAG:-dev}
@@ -11,4 +13,51 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-coverit}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_ACCESS_EXPIRY=${JWT_ACCESS_EXPIRY:-15m}
+      - JWT_REFRESH_EXPIRY_SECONDS=${JWT_REFRESH_EXPIRY_SECONDS:-604800}
+      - RESET_TOKEN_TTL_SECONDS=${RESET_TOKEN_TTL_SECONDS:-900}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:18
+    container_name: coverit-postgres
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-coverit}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: coverit-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
