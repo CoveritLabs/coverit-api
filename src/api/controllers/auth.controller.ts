@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '@services/auth.service';
+import { AUTH_MESSAGES } from '@constants/messages';
 
 
 export async function signup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -43,7 +44,7 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
             const response = await authService.logout(refreshToken);
             res.status(200).json(response);
         } else {
-            res.status(200).json({ message: 'Logged out successfully' });
+            res.status(200).json({ message: AUTH_MESSAGES.LOGOUT_SUCCESS });
         }
     } catch (err) {
         next(err);
@@ -56,7 +57,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
         authService.forgotPassword({ email }).catch((err) => {
             console.error('Error processing forgot-password:', err);
         });
-        res.status(200).json({ message: 'If an account with that email exists, a reset link was sent' });
+        res.status(200).json({ message: AUTH_MESSAGES.FORGOT_PASSWORD_SENT });
     } catch (err) {
         next(err);
     }

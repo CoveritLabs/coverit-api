@@ -25,6 +25,7 @@ import prisma from '@lib/prisma';
 import redis from '@lib/redis';
 import * as authService from '@services/auth.service';
 import { verifyAccessToken } from '@utils/token';
+import { AUTH_MESSAGES } from '@constants/messages';
 
 const mockPrisma = prisma as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 const mockRedis = redis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -67,7 +68,7 @@ describe('authService.signup', () => {
 
         await expect(
             authService.signup({ email: 'a@b.com', password: 'P@ssword1', name: 'Test' }),
-        ).rejects.toThrow('Email already registered');
+        ).rejects.toThrow(AUTH_MESSAGES.EMAIL_TAKEN);
     });
 });
 
@@ -108,7 +109,7 @@ describe('authService.login', () => {
 
         await expect(
             authService.login({ email: 'no@one.com', password: 'P@ssword1' }),
-        ).rejects.toThrow('Invalid email or password');
+        ).rejects.toThrow(AUTH_MESSAGES.INVALID_CREDENTIALS);
     });
 
     it('should throw UnauthorizedError if password is wrong', async () => {
@@ -124,7 +125,7 @@ describe('authService.login', () => {
 
         await expect(
             authService.login({ email: 'a@b.com', password: 'WrongPassword' }),
-        ).rejects.toThrow('Invalid email or password');
+        ).rejects.toThrow(AUTH_MESSAGES.INVALID_CREDENTIALS);
     });
 });
 
@@ -155,7 +156,7 @@ describe('authService.refresh', () => {
         mockRedis.scan.mockResolvedValue(['0', []]);
 
         await expect(authService.refresh('bad-token')).rejects.toThrow(
-            'Invalid or expired refresh token',
+            AUTH_MESSAGES.REFRESH_TOKEN_INVALID,
         );
     });
 });
@@ -177,7 +178,7 @@ describe('authService.logout', () => {
     it('should be a no-op if token not found in Redis', async () => {
         mockRedis.scan.mockResolvedValue(['0', []]);
 
-        await expect(authService.logout('unknown-token')).resolves.toMatchObject({ message: 'Logged out successfully' });
+        await expect(authService.logout('unknown-token')).resolves.toMatchObject({ message: AUTH_MESSAGES.LOGOUT_SUCCESS });
     });
 });
 
@@ -244,7 +245,7 @@ describe('authService.resetPassword', () => {
 
         await expect(
             authService.resetPassword({ token: 'expired-token', newPassword: 'NewP@ss1' }),
-        ).rejects.toThrow('Invalid or expired reset token');
+        ).rejects.toThrow(AUTH_MESSAGES.RESET_TOKEN_INVALID);
     });
 });
 

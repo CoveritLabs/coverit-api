@@ -20,12 +20,13 @@ import type {
     ResetPasswordRequest,
 } from '@models/auth';
 import type { MessageResponse } from '@models/common';
+import { AUTH_MESSAGES } from '@constants/messages';
 
 
 export async function signup(input: SignupRequest): Promise<MessageResponse> {
     const existing = await prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
-        throw new ConflictError('Email already registered');
+        throw new ConflictError(AUTH_MESSAGES.EMAIL_TAKEN);
     }
 
     const hashedPassword = await argon2.hash(input.password);
@@ -38,18 +39,18 @@ export async function signup(input: SignupRequest): Promise<MessageResponse> {
         },
     });
 
-    return { message: 'Account created successfully' };
+    return { message: AUTH_MESSAGES.SIGNUP_SUCCESS };
 }
 
 export async function login(input: LoginRequest): Promise<LoginResponse> {
     const user = await prisma.user.findUnique({ where: { email: input.email } });
     if (!user) {
-        throw new UnauthorizedError('Invalid email or password');
+        throw new UnauthorizedError(AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 
     const valid = await argon2.verify(user.password, input.password);
     if (!valid) {
-        throw new UnauthorizedError('Invalid email or password');
+        throw new UnauthorizedError(AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 
     const accessToken = generateAccessToken(user.id);
@@ -73,7 +74,7 @@ export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
     const oldHash = hashToken(oldRawToken);
     const matchedKeys = await scanKeys(`refresh:*:${oldHash}`);
     if (matchedKeys.length === 0) {
-        throw new UnauthorizedError('Invalid or expired refresh token');
+        throw new UnauthorizedError(AUTH_MESSAGES.REFRESH_TOKEN_INVALID);
     }
 
     const key = matchedKeys[0];
@@ -93,7 +94,7 @@ export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
     );
 
     return {
-        message: 'Token refreshed successfully',
+        message: AUTH_MESSAGES.REFRESH_SUCCESS,
         tokens: { accessToken, refreshToken: newRawRefresh },
     };
 }
@@ -105,7 +106,7 @@ export async function logout(rawRefreshToken: string): Promise<MessageResponse> 
         await redis.del(matchedKeys[0]);
     }
 
-    return { message: 'Logged out successfully' };
+    return { message: AUTH_MESSAGES.LOGOUT_SUCCESS };
 }
 
 export async function forgotPassword(input: ForgotPasswordRequest): Promise<void> {
@@ -126,7 +127,7 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
     const userId = await redis.get(resetKey(hashed));
 
     if (!userId) {
-        throw new BadRequestError('Invalid or expired reset token');
+        throw new BadRequestError(AUTH_MESSAGES.RESET_TOKEN_INVALID);
     }
 
     const hashedPassword = await argon2.hash(input.newPassword);
@@ -143,5 +144,5 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
         await redis.del(...refreshKeys);
     }
 
-    return { message: 'Password reset successfully' };
+    return { message: AUTH_MESSAGES.RESET_PASSWORD_SUCCESS };
 }

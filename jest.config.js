@@ -16,6 +16,7 @@ module.exports = {
         '^@services/(.*)$': '<rootDir>/src/services/$1',
         '^@utils/(.*)$': '<rootDir>/src/utils/$1',
         '^@models/(.*)$': '<rootDir>/src/models/$1',
+        '^@constants/(.*)$': '<rootDir>/src/constants/$1',
         '^@generated/(.*)$': '<rootDir>/src/generated/$1',
     },
     clearMocks: true,

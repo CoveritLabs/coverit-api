@@ -15,7 +15,8 @@
             "@services/*": ["services/*"],
             "@utils/*": ["utils/*"],
             "@generated/*": ["generated/*"],
-            "@models/*": ["models/*"]
+            "@models/*": ["models/*"],
+            "@constants/*": ["constants/*"]
         },
         "strict": true,
         "esModuleInterop": true,

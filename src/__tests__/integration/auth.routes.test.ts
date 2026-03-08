@@ -8,6 +8,7 @@
 
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { AUTH_MESSAGES, AUTH_VALIDATION } from '@constants/messages';
 
 jest.mock('@lib/prisma', () => require('../mocks/prisma'));
 jest.mock('@lib/redis', () => require('../mocks/redis'));
@@ -53,7 +54,7 @@ describe('POST /auth/signup', () => {
             .send({ email: 'new@user.com', password: 'P@ssword1', name: 'New User' });
 
         expect(res.status).toBe(201);
-        expect(res.body.message).toBe('Account created successfully');
+        expect(res.body.message).toBe(AUTH_MESSAGES.SIGNUP_SUCCESS);
     });
 
     it('should return 409 if email already exists', async () => {
@@ -71,7 +72,7 @@ describe('POST /auth/signup', () => {
             .send({ email: 'dup@user.com', password: 'P@ssword1', name: 'Dup' });
 
         expect(res.status).toBe(409);
-        expect(res.body.message).toBe('Email already registered');
+        expect(res.body.message).toBe(AUTH_MESSAGES.EMAIL_TAKEN);
     });
 
     it('should not return any tokens or set cookies', async () => {
@@ -126,7 +127,7 @@ describe('POST /auth/login', () => {
             .send({ email: 'wrong@test.com', password: 'P@ssword1' });
 
         expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Invalid email or password');
+        expect(res.body.message).toBe(AUTH_MESSAGES.INVALID_CREDENTIALS);
     });
 
     it('should return 401 for wrong password', async () => {
@@ -145,7 +146,7 @@ describe('POST /auth/login', () => {
             .send({ email: 'user@test.com', password: 'WrongPass' });
 
         expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Invalid email or password');
+        expect(res.body.message).toBe(AUTH_MESSAGES.INVALID_CREDENTIALS);
     });
 });
 
@@ -165,7 +166,7 @@ describe('POST /auth/refresh', () => {
             .send({ refreshToken: oldToken });
 
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Tokens refreshed');
+        expect(res.body.message).toBe(AUTH_MESSAGES.REFRESH_SUCCESS);
         expect(res.body.tokens).toBeDefined();
         expect(res.body.tokens.accessToken).toBeDefined();
         expect(res.body.tokens.refreshToken).toBeDefined();
@@ -176,8 +177,8 @@ describe('POST /auth/refresh', () => {
             .post('/auth/refresh')
             .send({});
 
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Missing refresh token');
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe(AUTH_VALIDATION.REFRESH_TOKEN_REQUIRED);
     });
 
     it('should return 401 if refresh token not in Redis', async () => {
@@ -206,7 +207,7 @@ describe('POST /auth/logout', () => {
             .send({ refreshToken: token });
 
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Logged out');
+        expect(res.body.message).toBe(AUTH_MESSAGES.LOGOUT_SUCCESS);
     });
 
     it('should return 200 even without a refresh token (graceful)', async () => {
@@ -215,7 +216,7 @@ describe('POST /auth/logout', () => {
             .send({});
 
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Logged out');
+        expect(res.body.message).toBe(AUTH_MESSAGES.LOGOUT_SUCCESS);
     });
 });
 
@@ -298,7 +299,7 @@ describe('POST /auth/reset-password', () => {
             .send({ token: rawToken, newPassword: 'NewP@ssword1' });
 
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Password reset successfully');
+        expect(res.body.message).toBe(AUTH_MESSAGES.RESET_PASSWORD_SUCCESS);
         expect(mockRedis.get).toHaveBeenCalledWith(`reset:${hashed}`);
     });
 
@@ -310,7 +311,7 @@ describe('POST /auth/reset-password', () => {
             .send({ token: 'bad-token', newPassword: 'NewP@ssword1' });
 
         expect(res.status).toBe(400);
-        expect(res.body.message).toBe('Invalid or expired reset token');
+        expect(res.body.message).toBe(AUTH_MESSAGES.RESET_TOKEN_INVALID);
     });
 
     it('should purge all refresh tokens (global logout) after reset', async () => {
