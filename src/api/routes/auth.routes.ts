@@ -4,6 +4,14 @@
 
 import { Router } from 'express';
 import * as authController from '@api/controllers/auth.controller';
+import { validateBody } from '@api/middlewares/validate';
+import {
+    SignupRequestSchema,
+    LoginRequestSchema,
+    RefreshRequestSchema,
+    ForgotPasswordRequestSchema,
+    ResetPasswordRequestSchema,
+} from '@models/auth';
 
 const router = Router();
 
@@ -48,7 +56,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/signup', authController.signup);
+router.post('/signup', validateBody(SignupRequestSchema), authController.signup);
 
 /**
  * @openapi
@@ -97,7 +105,7 @@ router.post('/signup', authController.signup);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', authController.login);
+router.post('/login', validateBody(LoginRequestSchema), authController.login);
 
 /**
  * @openapi
@@ -140,7 +148,7 @@ router.post('/login', authController.login);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/refresh', authController.refresh);
+router.post('/refresh', validateBody(RefreshRequestSchema), authController.refresh);
 
 /**
  * @openapi
@@ -196,7 +204,7 @@ router.post('/logout', authController.logout);
  *             schema:
  *               $ref: '#/components/schemas/MessageResponse'
  */
-router.post('/forgot-password', authController.forgotPassword);
+router.post('/forgot-password', validateBody(ForgotPasswordRequestSchema), authController.forgotPassword);
 
 /**
  * @openapi
@@ -236,6 +244,6 @@ router.post('/forgot-password', authController.forgotPassword);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/reset-password', authController.resetPassword);
+router.post('/reset-password', validateBody(ResetPasswordRequestSchema), authController.resetPassword);
 
 export default router;

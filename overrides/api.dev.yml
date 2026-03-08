@@ -12,6 +12,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        NPM_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma

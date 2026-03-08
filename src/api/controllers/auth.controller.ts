@@ -29,10 +29,6 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { refreshToken } = req.body;
-        if (!refreshToken) {
-            res.status(401).json({ message: 'Missing refresh token' });
-            return;
-        }
         const response = await authService.refresh(refreshToken);
         res.status(200).json(response);
     } catch (err) {

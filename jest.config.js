@@ -15,8 +15,8 @@ module.exports = {
         '^@lib/(.*)$': '<rootDir>/src/lib/$1',
         '^@services/(.*)$': '<rootDir>/src/services/$1',
         '^@utils/(.*)$': '<rootDir>/src/utils/$1',
+        '^@models/(.*)$': '<rootDir>/src/models/$1',
         '^@generated/(.*)$': '<rootDir>/src/generated/$1',
-        '^@types/(.*)$': '<rootDir>/src/types/$1',
     },
     clearMocks: true,
     collectCoverageFrom: [

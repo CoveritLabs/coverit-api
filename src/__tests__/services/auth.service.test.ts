@@ -206,7 +206,7 @@ describe('authService.forgotPassword', () => {
     it('should do nothing (no throw) if user does not exist', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
 
-        await expect(authService.forgotPassword({ email: 'no@one.com' })).resolves.toMatchObject({ message: 'Password reset instructions sent' });
+        await expect(authService.forgotPassword({ email: 'no@one.com' })).resolves.toBeUndefined();
         expect(mockRedis.set).not.toHaveBeenCalled();
     });
 });

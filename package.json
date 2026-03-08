@@ -25,7 +25,7 @@
     },
     "dependencies": {
         "@bufbuild/protobuf": "^2.11.0",
-        "@coveritlabs/contracts": "github:CoveritLabs/coverit-contracts#main",
+        "@coveritlabs/contracts": "^1.1.0",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "argon2": "^0.44.0",
@@ -38,7 +38,8 @@
         "pg": "^8.20.0",
         "prisma": "^7.4.2",
         "swagger-jsdoc": "^6.2.8",
-        "swagger-ui-express": "^5.0.1"
+        "swagger-ui-express": "^5.0.1",
+        "zod": "^4.3.6"
     },
     "devDependencies": {
         "@commitlint/cli": "^20.4.3",
