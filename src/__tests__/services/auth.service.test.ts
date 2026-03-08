@@ -89,10 +89,10 @@ describe('authService.login', () => {
         const result = await authService.login({ email: 'a@b.com', password: 'P@ssword1' });
 
         expect(result.user).toEqual({ id: 'uuid-1', email: 'a@b.com', name: 'Test' });
-        expect(result.tokens.accessToken).toBeDefined();
-        expect(result.tokens.refreshToken).toBeDefined();
+        expect(result.tokens?.accessToken).toBeDefined();
+        expect(result.tokens?.refreshToken).toBeDefined();
 
-        const decoded = jwt.verify(result.tokens.accessToken, 'test-secret') as jwt.JwtPayload;
+        const decoded = jwt.verify(result.tokens!.accessToken, 'test-secret') as jwt.JwtPayload;
         expect(decoded.sub).toBe('uuid-1');
 
         expect(mockRedis.set).toHaveBeenCalledWith(
@@ -140,8 +140,8 @@ describe('authService.refresh', () => {
 
         const result = await authService.refresh(rawToken);
 
-        expect(result.accessToken).toBeDefined();
-        expect(result.refreshToken).toBeDefined();
+        expect(result.tokens?.accessToken).toBeDefined();
+        expect(result.tokens?.refreshToken).toBeDefined();
         expect(mockRedis.del).toHaveBeenCalledWith(key);
         expect(mockRedis.set).toHaveBeenCalledWith(
             expect.stringContaining('refresh:uuid-1:'),
@@ -177,7 +177,7 @@ describe('authService.logout', () => {
     it('should be a no-op if token not found in Redis', async () => {
         mockRedis.scan.mockResolvedValue(['0', []]);
 
-        await expect(authService.logout('unknown-token')).resolves.toBeUndefined();
+        await expect(authService.logout('unknown-token')).resolves.toMatchObject({ message: 'Logged out successfully' });
     });
 });
 
@@ -193,7 +193,7 @@ describe('authService.forgotPassword', () => {
         });
         mockRedis.set.mockResolvedValue('OK');
 
-        await authService.forgotPassword('a@b.com');
+        await authService.forgotPassword({ email: 'a@b.com' });
 
         expect(mockRedis.set).toHaveBeenCalledWith(
             expect.stringContaining('reset:'),
@@ -206,7 +206,7 @@ describe('authService.forgotPassword', () => {
     it('should do nothing (no throw) if user does not exist', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
 
-        await expect(authService.forgotPassword('no@one.com')).resolves.toBeUndefined();
+        await expect(authService.forgotPassword({ email: 'no@one.com' })).resolves.toMatchObject({ message: 'Password reset instructions sent' });
         expect(mockRedis.set).not.toHaveBeenCalled();
     });
 });

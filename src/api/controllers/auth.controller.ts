@@ -9,8 +9,8 @@ import * as authService from '@services/auth.service';
 export async function signup(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { email, password, name } = req.body;
-        await authService.signup({ email, password, name });
-        res.status(201).json({ message: 'Account created successfully' });
+        const response = await authService.signup({ email, password, name });
+        res.status(201).json(response);
     } catch (err) {
         next(err);
     }
@@ -19,8 +19,8 @@ export async function signup(req: Request, res: Response, next: NextFunction): P
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { email, password } = req.body;
-        const { tokens, user } = await authService.login({ email, password });
-        res.status(200).json({ user, tokens });
+        const response = await authService.login({ email, password });
+        res.status(200).json(response);
     } catch (err) {
         next(err);
     }
@@ -33,8 +33,8 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
             res.status(401).json({ message: 'Missing refresh token' });
             return;
         }
-        const tokens = await authService.refresh(refreshToken);
-        res.status(200).json({ message: 'Tokens refreshed', tokens });
+        const response = await authService.refresh(refreshToken);
+        res.status(200).json(response);
     } catch (err) {
         next(err);
     }
@@ -44,9 +44,11 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
     try {
         const { refreshToken } = req.body;
         if (refreshToken) {
-            await authService.logout(refreshToken);
+            const response = await authService.logout(refreshToken);
+            res.status(200).json(response);
+        } else {
+            res.status(200).json({ message: 'Logged out successfully' });
         }
-        res.status(200).json({ message: 'Logged out' });
     } catch (err) {
         next(err);
     }
@@ -55,8 +57,7 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
 export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { email } = req.body;
-        // Fire-and-forget: do not await so the response returns immediately
-        authService.forgotPassword(email).catch((err) => {
+        authService.forgotPassword({ email }).catch((err) => {
             console.error('Error processing forgot-password:', err);
         });
         res.status(200).json({ message: 'If an account with that email exists, a reset link was sent' });
@@ -68,8 +69,8 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
 export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { token, newPassword } = req.body;
-        await authService.resetPassword({ token, newPassword });
-        res.status(200).json({ message: 'Password reset successfully' });
+        const response = await authService.resetPassword({ token, newPassword });
+        res.status(200).json(response);
     } catch (err) {
         next(err);
     }

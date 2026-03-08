@@ -11,9 +11,18 @@ import { env } from '@config/env';
 import { BadRequestError, ConflictError, UnauthorizedError } from '@utils/errors';
 import { generateAccessToken, generateRefreshToken, hashToken } from '@utils/token';
 
-import type { SignupInput, LoginInput, TokenPair, UserInfo, ResetPasswordInput } from '../types/auth';
+import type {
+    SignupRequest,
+    LoginRequest,
+    LoginResponse,
+    RefreshResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+} from '@models/auth';
+import type { MessageResponse } from '@models/common';
 
-export async function signup(input: SignupInput): Promise<void> {
+
+export async function signup(input: SignupRequest): Promise<MessageResponse> {
     const existing = await prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
         throw new ConflictError('Email already registered');
@@ -28,9 +37,11 @@ export async function signup(input: SignupInput): Promise<void> {
             name: input.name,
         },
     });
+
+    return { message: 'Account created successfully' };
 }
 
-export async function login(input: LoginInput): Promise<{ tokens: TokenPair; user: UserInfo }> {
+export async function login(input: LoginRequest): Promise<LoginResponse> {
     const user = await prisma.user.findUnique({ where: { email: input.email } });
     if (!user) {
         throw new UnauthorizedError('Invalid email or password');
@@ -58,7 +69,7 @@ export async function login(input: LoginInput): Promise<{ tokens: TokenPair; use
     };
 }
 
-export async function refresh(oldRawToken: string): Promise<TokenPair> {
+export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
     const oldHash = hashToken(oldRawToken);
     const matchedKeys = await scanKeys(`refresh:*:${oldHash}`);
     if (matchedKeys.length === 0) {
@@ -81,19 +92,24 @@ export async function refresh(oldRawToken: string): Promise<TokenPair> {
         env.JWT_REFRESH_EXPIRY_SECONDS,
     );
 
-    return { accessToken, refreshToken: newRawRefresh };
+    return {
+        message: 'Token refreshed successfully',
+        tokens: { accessToken, refreshToken: newRawRefresh },
+    };
 }
 
-export async function logout(rawRefreshToken: string): Promise<void> {
+export async function logout(rawRefreshToken: string): Promise<MessageResponse> {
     const hash = hashToken(rawRefreshToken);
     const matchedKeys = await scanKeys(`refresh:*:${hash}`);
     if (matchedKeys.length > 0) {
         await redis.del(matchedKeys[0]);
     }
+
+    return { message: 'Logged out successfully' };
 }
 
-export async function forgotPassword(email: string): Promise<void> {
-    const user = await prisma.user.findUnique({ where: { email } });
+export async function forgotPassword(input: ForgotPasswordRequest): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { email: input.email } });
     if (!user) return;
 
     const rawToken = crypto.randomBytes(32).toString('base64url');
@@ -105,7 +121,7 @@ export async function forgotPassword(email: string): Promise<void> {
     console.info(`[job:email] Enqueue password-reset email for userId=${user.id} token=${rawToken}`);
 }
 
-export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+export async function resetPassword(input: ResetPasswordRequest): Promise<MessageResponse> {
     const hashed = hashToken(input.token);
     const userId = await redis.get(resetKey(hashed));
 
@@ -126,4 +142,6 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
     if (refreshKeys.length > 0) {
         await redis.del(...refreshKeys);
     }
+
+    return { message: 'Password reset successfully' };
 }

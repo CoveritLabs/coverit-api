@@ -24,6 +24,8 @@
         }
     },
     "dependencies": {
+        "@bufbuild/protobuf": "^2.11.0",
+        "@coveritlabs/contracts": "github:CoveritLabs/coverit-contracts#main",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "argon2": "^0.44.0",
