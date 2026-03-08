@@ -3,8 +3,11 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+ARG NPM_TOKEN
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n" > .npmrc \
+  && npm ci --ignore-scripts \
+  && rm -f .npmrc
 
 COPY prisma ./prisma
 COPY prisma.config.ts ./
@@ -22,7 +25,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts --omit=dev
+ARG NPM_TOKEN
+RUN printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n" > .npmrc \
+  && npm ci --ignore-scripts --omit=dev \
+  && rm -f .npmrc
 
 COPY prisma ./prisma
 COPY prisma.config.ts ./
