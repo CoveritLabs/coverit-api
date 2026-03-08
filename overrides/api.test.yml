@@ -10,5 +10,5 @@ services:
   api:
     image: coverit-api-test-local
     build:
-      context: .
+      context: ${API_DIR}
       dockerfile: Dockerfile

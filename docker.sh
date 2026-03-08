@@ -9,6 +9,11 @@
 # Proprietary and confidential. Unauthorized use is strictly prohibited.
 # See LICENSE file in the project root for full license information.
 
+
+# Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+# Proprietary and confidential. Unauthorized use is strictly prohibited.
+# See LICENSE file in the project root for full license information.
+
 # Usage:
 #   ./docker.sh up                   → remote image + cloud db/redis
 #   ./docker.sh up --local           → local dev build + hot-reload + local db/redis
@@ -20,6 +25,9 @@ print_help() {
 }
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export API_DIR="$SCRIPT_DIR"
 
 CMD="${1:-up}"
 shift 2>/dev/null || true

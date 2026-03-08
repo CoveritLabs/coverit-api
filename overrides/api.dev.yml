@@ -10,16 +10,16 @@ services:
   api:
     image: coverit-api-dev-local
     build:
-      context: .
+      context: ${API_DIR}
       dockerfile: Dockerfile.dev
       args:
         NPM_TOKEN: ${GITHUB_TOKEN}
     volumes:
-      - ./src:/app/src
-      - ./prisma:/app/prisma
-      - ./prisma.config.ts:/app/prisma.config.ts
-      - ./nodemon.json:/app/nodemon.json
-      - ./tsconfig.json:/app/tsconfig.json
+      - ${API_DIR}/src:/app/src
+      - ${API_DIR}/prisma:/app/prisma
+      - ${API_DIR}/prisma.config.ts:/app/prisma.config.ts
+      - ${API_DIR}/nodemon.json:/app/nodemon.json
+      - ${API_DIR}/tsconfig.json:/app/tsconfig.json
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/coverit_dev?schema=public
