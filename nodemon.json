@@ -6,5 +6,6 @@
     "ignore": [
         "src/**/*.spec.ts"
     ],
+    "legacyWatch": true,
     "exec": "ts-node -r tsconfig-paths/register src/index.ts"
 }

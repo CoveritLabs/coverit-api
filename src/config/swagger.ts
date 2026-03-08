@@ -2,57 +2,24 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import swaggerJsdoc from 'swagger-jsdoc';
+import { OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { env } from '@config/env';
+import { registry } from '@config/openapi';
 
-const options: swaggerJsdoc.Options = {
-    definition: {
-        openapi: '3.0.3',
-        info: {
-            title: 'CoverIt API',
-            version: '0.1.0',
-            description: 'CoverIt REST API — authentication and platform services',
-        },
-        servers: [
-            {
-                url: `http://localhost:${env.PORT}`,
-                description: 'Local development',
-            },
-        ],
-        components: {
-            schemas: {
-                UserInfo: {
-                    type: 'object',
-                    properties: {
-                        id: { type: 'string', format: 'uuid' },
-                        email: { type: 'string', format: 'email' },
-                        name: { type: 'string' },
-                    },
-                },
-                MessageResponse: {
-                    type: 'object',
-                    properties: {
-                        message: { type: 'string' },
-                    },
-                },
-                ErrorResponse: {
-                    type: 'object',
-                    properties: {
-                        message: { type: 'string' },
-                    },
-                },
-            },
-            securitySchemes: {
-                bearerAuth: {
-                    type: 'http',
-                    scheme: 'bearer',
-                    bearerFormat: 'JWT',
-                    description: 'Access token returned by login/refresh — send as `Authorization: Bearer <token>`',
-                },
-            },
-        },
+const generator = new OpenApiGeneratorV3(registry.definitions);
+
+export const swaggerSpec = generator.generateDocument({
+    openapi: '3.0.3',
+    info: {
+        title: 'CoverIt API',
+        version: '0.1.0',
+        description: 'CoverIt REST API — authentication and platform services',
     },
-    apis: ['./src/api/routes/*.ts'],
-};
+    servers: [
+        {
+            url: `http://localhost:${env.PORT}`,
+            description: 'Local development',
+        },
+    ],
+});
 
-export const swaggerSpec = swaggerJsdoc(options);
