@@ -20,6 +20,7 @@ jest.mock('@config/env', () => ({
         JWT_ACCESS_EXPIRY: '15m',
         JWT_REFRESH_EXPIRY_SECONDS: 604800,
         RESET_TOKEN_TTL_SECONDS: 900,
+        API_PREFIX: '/api/v1',
     },
 }));
 
@@ -32,6 +33,9 @@ import argon2 from 'argon2';
 import prisma from '@lib/prisma';
 import redis from '@lib/redis';
 import app from '../../app';
+import { env } from '@config/env';
+
+const BASE = `${env.API_PREFIX}/auth`;
 
 const mockPrisma = prisma as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 const mockRedis = redis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -50,7 +54,7 @@ describe('POST /auth/signup', () => {
         });
 
         const res = await request(app)
-            .post('/auth/signup')
+            .post(`${BASE}/signup`)
             .send({ email: 'new@user.com', password: 'P@ssword1', name: 'New User' });
 
         expect(res.status).toBe(201);
@@ -68,7 +72,7 @@ describe('POST /auth/signup', () => {
         });
 
         const res = await request(app)
-            .post('/auth/signup')
+            .post(`${BASE}/signup`)
             .send({ email: 'dup@user.com', password: 'P@ssword1', name: 'Dup' });
 
         expect(res.status).toBe(409);
@@ -87,7 +91,7 @@ describe('POST /auth/signup', () => {
         });
 
         const res = await request(app)
-            .post('/auth/signup')
+            .post(`${BASE}/signup`)
             .send({ email: 'a@b.com', password: 'P@ssword1', name: 'User' });
 
         expect(res.status).toBe(201);
@@ -109,7 +113,7 @@ describe('POST /auth/login', () => {
         mockRedis.set.mockResolvedValue('OK');
 
         const res = await request(app)
-            .post('/auth/login')
+            .post(`${BASE}/login`)
             .send({ email: 'user@test.com', password: 'P@ssword1' });
 
         expect(res.status).toBe(200);
@@ -123,7 +127,7 @@ describe('POST /auth/login', () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
 
         const res = await request(app)
-            .post('/auth/login')
+            .post(`${BASE}/login`)
             .send({ email: 'wrong@test.com', password: 'P@ssword1' });
 
         expect(res.status).toBe(401);
@@ -142,7 +146,7 @@ describe('POST /auth/login', () => {
         mockArgon2.verify.mockResolvedValue(false);
 
         const res = await request(app)
-            .post('/auth/login')
+            .post(`${BASE}/login`)
             .send({ email: 'user@test.com', password: 'WrongPass' });
 
         expect(res.status).toBe(401);
@@ -162,7 +166,7 @@ describe('POST /auth/refresh', () => {
         mockRedis.set.mockResolvedValue('OK');
 
         const res = await request(app)
-            .post('/auth/refresh')
+            .post(`${BASE}/refresh`)
             .send({ refreshToken: oldToken });
 
         expect(res.status).toBe(200);
@@ -174,7 +178,7 @@ describe('POST /auth/refresh', () => {
 
     it('should return 401 if no refresh token in body', async () => {
         const res = await request(app)
-            .post('/auth/refresh')
+            .post(`${BASE}/refresh`)
             .send({});
 
         expect(res.status).toBe(400);
@@ -185,7 +189,7 @@ describe('POST /auth/refresh', () => {
         mockRedis.scan.mockResolvedValue(['0', []]);
 
         const res = await request(app)
-            .post('/auth/refresh')
+            .post(`${BASE}/refresh`)
             .send({ refreshToken: 'bad-token' });
 
         expect(res.status).toBe(401);
@@ -203,7 +207,7 @@ describe('POST /auth/logout', () => {
         mockRedis.del.mockResolvedValue(1);
 
         const res = await request(app)
-            .post('/auth/logout')
+            .post(`${BASE}/logout`)
             .send({ refreshToken: token });
 
         expect(res.status).toBe(200);
@@ -212,7 +216,7 @@ describe('POST /auth/logout', () => {
 
     it('should return 200 even without a refresh token (graceful)', async () => {
         const res = await request(app)
-            .post('/auth/logout')
+            .post(`${BASE}/logout`)
             .send({});
 
         expect(res.status).toBe(200);
@@ -225,7 +229,7 @@ describe('POST /auth/forgot-password', () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
 
         const res = await request(app)
-            .post('/auth/forgot-password')
+            .post(`${BASE}/forgot-password`)
             .send({ email: 'nonexistent@test.com' });
 
         expect(res.status).toBe(200);
@@ -244,7 +248,7 @@ describe('POST /auth/forgot-password', () => {
         mockRedis.set.mockResolvedValue('OK');
 
         const res = await request(app)
-            .post('/auth/forgot-password')
+            .post(`${BASE}/forgot-password`)
             .send({ email: 'exists@test.com' });
 
         expect(res.status).toBe(200);
@@ -254,7 +258,7 @@ describe('POST /auth/forgot-password', () => {
     it('should not leak whether the email exists via timing or response', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(null);
         const res1 = await request(app)
-            .post('/auth/forgot-password')
+            .post(`${BASE}/forgot-password`)
             .send({ email: 'a@b.com' });
 
         mockPrisma.user.findUnique.mockResolvedValue({
@@ -267,7 +271,7 @@ describe('POST /auth/forgot-password', () => {
         });
         mockRedis.set.mockResolvedValue('OK');
         const res2 = await request(app)
-            .post('/auth/forgot-password')
+            .post(`${BASE}/forgot-password`)
             .send({ email: 'a@b.com' });
 
         expect(res1.body).toEqual(res2.body);
@@ -295,7 +299,7 @@ describe('POST /auth/reset-password', () => {
         mockRedis.scan.mockResolvedValueOnce(['0', []]);
 
         const res = await request(app)
-            .post('/auth/reset-password')
+            .post(`${BASE}/reset-password`)
             .send({ token: rawToken, newPassword: 'NewP@ssword1' });
 
         expect(res.status).toBe(200);
@@ -307,7 +311,7 @@ describe('POST /auth/reset-password', () => {
         mockRedis.get.mockResolvedValue(null);
 
         const res = await request(app)
-            .post('/auth/reset-password')
+            .post(`${BASE}/reset-password`)
             .send({ token: 'bad-token', newPassword: 'NewP@ssword1' });
 
         expect(res.status).toBe(400);
@@ -333,7 +337,7 @@ describe('POST /auth/reset-password', () => {
         mockRedis.scan.mockResolvedValueOnce(['0', ['refresh:uuid-1:abc']]);
 
         await request(app)
-            .post('/auth/reset-password')
+            .post(`${BASE}/reset-password`)
             .send({ token: rawToken, newPassword: 'NewP@ss1' });
 
         expect(mockRedis.del).toHaveBeenCalledWith(`reset:${hashed}`);
