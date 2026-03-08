@@ -33,7 +33,8 @@ app.get('/docs.json', (_req: Request, res: Response) => {
     res.json(swaggerSpec);
 });
 
-app.use('/auth', authRoutes);
+const apiBase = env.API_PREFIX;
+app.use(`${apiBase}/auth`, authRoutes);
 
 app.use(errorHandler);
 

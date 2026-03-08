@@ -12,4 +12,5 @@ export const env = {
     JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY ?? '15m',
     JWT_REFRESH_EXPIRY_SECONDS: parseInt(process.env.JWT_REFRESH_EXPIRY_SECONDS ?? '604800', 10), // 7 days
     RESET_TOKEN_TTL_SECONDS: parseInt(process.env.RESET_TOKEN_TTL_SECONDS ?? '900', 10), // 15 min
+    API_PREFIX: process.env.API_PREFIX ?? '/api/v1',
 } as const;

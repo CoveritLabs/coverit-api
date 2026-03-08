@@ -17,7 +17,7 @@ export const swaggerSpec = generator.generateDocument({
     },
     servers: [
         {
-            url: `http://localhost:${env.PORT}`,
+            url: `http://localhost:${env.PORT}${env.API_PREFIX}`,
             description: 'Local development',
         },
     ],
