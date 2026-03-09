@@ -14,6 +14,9 @@ node_modules
 # Build output
 dist
 
+# Test / coverage
+coverage
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -32,3 +35,5 @@ dist
 .env
 .env.local
 .env.*.local
+
+/src/generated/prisma

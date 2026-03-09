@@ -7,13 +7,22 @@
         ],
         "outDir": "./dist",
         "rootDir": "./src",
+        "baseUrl": "./src",
+        "paths": {
+            "@api/*": ["api/*"],
+            "@config/*": ["config/*"],
+            "@lib/*": ["lib/*"],
+            "@services/*": ["services/*"],
+            "@utils/*": ["utils/*"],
+            "@generated/*": ["generated/*"],
+            "@models/*": ["models/*"],
+            "@constants/*": ["constants/*"]
+        },
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true,
-        "declaration": true,
-        "declarationMap": true,
         "sourceMap": true
     },
     "include": [
