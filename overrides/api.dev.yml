@@ -12,8 +12,8 @@ services:
     build:
       context: ${API_DIR}
       dockerfile: Dockerfile.dev
-      args:
-        NPM_TOKEN: ${GITHUB_TOKEN}
+      secrets:
+        - npm_token
     volumes:
       - ${API_DIR}/src:/app/src
       - ${API_DIR}/prisma:/app/prisma
@@ -24,3 +24,7 @@ services:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/coverit_dev?schema=public
       - JWT_SECRET=dev-secret-do-not-use-in-production
+
+secrets:
+  npm_token:
+    environment: GITHUB_TOKEN

@@ -3,9 +3,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-ARG NPM_TOKEN
 COPY package.json package-lock.json ./
-RUN printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n" > .npmrc \
+RUN --mount=type=secret,id=npm_token \
+  printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=$(cat /run/secrets/npm_token)\n" > .npmrc \
   && npm ci --ignore-scripts \
   && rm -f .npmrc
 
@@ -25,8 +25,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-ARG NPM_TOKEN
-RUN printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n" > .npmrc \
+RUN --mount=type=secret,id=npm_token \
+  printf "@coveritlabs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=$(cat /run/secrets/npm_token)\n" > .npmrc \
   && npm ci --ignore-scripts --omit=dev \
   && rm -f .npmrc
 
