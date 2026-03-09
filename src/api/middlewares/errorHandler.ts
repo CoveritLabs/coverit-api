@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '@utils/errors';
+import { StatusCodes } from 'http-status-codes';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
     if (err instanceof AppError) {
@@ -12,5 +13,5 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     }
 
     console.error('Unhandled error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Internal server error' });
 }

@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Request, Response, NextFunction } from 'express';
+import { StatusCodes } from 'http-status-codes';
 import { ZodType } from 'zod';
 
 /**
@@ -16,7 +17,7 @@ export function validateBody<T>(schema: ZodType<T>) {
         const result = schema.safeParse(req.body);
         if (!result.success) {
             const firstIssue = result.error.issues[0];
-            res.status(400).json({
+            res.status(StatusCodes.BAD_REQUEST).json({
                 error: 'Validation failed',
                 message: firstIssue?.message ?? 'Invalid request body',
             });
