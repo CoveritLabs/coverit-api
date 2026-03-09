@@ -270,3 +270,43 @@ describe('verifyAccessToken', () => {
         expect(() => verifyAccessToken(token)).toThrow('Malformed token');
     });
 });
+
+describe('authService.oauthLogin', () => {
+    it('should create a new user when none exists and return tokens', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        mockPrisma.user.create.mockResolvedValue({
+            id: 'uuid-2',
+            email: 'oauth@user.com',
+            name: 'OAuth User',
+            provider: 'google',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+        mockRedis.set.mockResolvedValue('OK');
+
+        const res = await authService.oauthLogin('google', { email: 'oauth@user.com', name: 'OAuth User' });
+
+        expect(mockPrisma.user.create).toHaveBeenCalled();
+        expect(res.user).toEqual({ id: 'uuid-2', email: 'oauth@user.com', name: 'OAuth User' });
+        expect(res.tokens?.accessToken).toBeDefined();
+        expect(res.tokens?.refreshToken).toBeDefined();
+        expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining('refresh:uuid-2:'), '1', 'EX', 604800);
+    });
+
+    it('should use existing user when found and return tokens', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+            id: 'uuid-3',
+            email: 'exist@user.com',
+            name: 'Existing',
+        });
+        mockRedis.set.mockResolvedValue('OK');
+
+        const res = await authService.oauthLogin('google', { email: 'exist@user.com', name: 'Existing' });
+
+        expect(mockPrisma.user.create).not.toHaveBeenCalled();
+        expect(res.user).toEqual({ id: 'uuid-3', email: 'exist@user.com', name: 'Existing' });
+        expect(res.tokens?.accessToken).toBeDefined();
+        expect(res.tokens?.refreshToken).toBeDefined();
+        expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining('refresh:uuid-3:'), '1', 'EX', 604800);
+    });
+});
