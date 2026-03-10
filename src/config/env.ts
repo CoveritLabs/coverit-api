@@ -13,4 +13,13 @@ export const env = {
     JWT_REFRESH_EXPIRY_SECONDS: parseInt(process.env.JWT_REFRESH_EXPIRY_SECONDS ?? '604800', 10), // 7 days
     RESET_TOKEN_TTL_SECONDS: parseInt(process.env.RESET_TOKEN_TTL_SECONDS ?? '900', 10), // 15 min
     API_PREFIX: process.env.API_PREFIX ?? '/api/v1',
+
+    // OAuth
+    OAUTH_FRONTEND_URL: process.env.OAUTH_FRONTEND_URL ?? 'http://localhost:5173',
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/oauth/google/callback',
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID ?? '',
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? '',
+    GITHUB_CALLBACK_URL: process.env.GITHUB_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/oauth/github/callback',
 } as const;

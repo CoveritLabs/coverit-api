@@ -22,4 +22,8 @@ router.post('/logout', authController.logout);
 router.post('/forgot-password', validateBody(ForgotPasswordRequestSchema), authController.forgotPassword);
 router.post('/reset-password', validateBody(ResetPasswordRequestSchema), authController.resetPassword);
 
+// OAuth
+router.get('/oauth/:provider', authController.oauthRedirect);
+router.get('/oauth/:provider/callback', authController.oauthCallback);
+
 export default router;

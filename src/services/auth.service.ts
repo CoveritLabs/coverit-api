@@ -21,6 +21,7 @@ import type {
 } from '@models/auth';
 import type { MessageResponse } from '@models/common';
 import { AUTH_MESSAGES } from '@constants/messages';
+import type { OAuthProvider } from 'types/auth';
 
 
 export async function signup(input: SignupRequest): Promise<MessageResponse> {
@@ -44,7 +45,7 @@ export async function signup(input: SignupRequest): Promise<MessageResponse> {
 
 export async function login(input: LoginRequest): Promise<LoginResponse> {
     const user = await prisma.user.findUnique({ where: { email: input.email } });
-    if (!user) {
+    if (!user || !user.password) {
         throw new UnauthorizedError(AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 
@@ -145,4 +146,37 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
     }
 
     return { message: AUTH_MESSAGES.RESET_PASSWORD_SUCCESS };
+}
+
+export async function oauthLogin(
+    provider: OAuthProvider,
+    profile: { email: string; name: string },
+): Promise<LoginResponse> {
+    let user = await prisma.user.findUnique({ where: { email: profile.email } });
+
+    if (!user) {
+        user = await prisma.user.create({
+            data: {
+                email: profile.email,
+                name: profile.name,
+                provider,
+            },
+        });
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const rawRefreshToken = generateRefreshToken();
+    const hashedRefresh = hashToken(rawRefreshToken);
+
+    await redis.set(
+        refreshKey(user.id, hashedRefresh),
+        '1',
+        'EX',
+        env.JWT_REFRESH_EXPIRY_SECONDS,
+    );
+
+    return {
+        tokens: { accessToken, refreshToken: rawRefreshToken },
+        user: { id: user.id, email: user.email, name: user.name },
+    };
 }

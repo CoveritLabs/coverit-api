@@ -26,6 +26,15 @@ export const AUTH_MESSAGES = {
     // reset-password
     RESET_PASSWORD_SUCCESS: 'Password reset successfully',
     RESET_TOKEN_INVALID: 'Invalid or expired reset token',
+
+    // oauth
+    UNSUPPORTED_OAUTH_PROVIDER: 'Unsupported OAuth provider',
+    OAUTH_PROVIDER_NOT_CONFIGURED: 'OAuth provider is not configured',
+    OAUTH_CODE_MISSING: 'Authorization code missing from callback',
+    OAUTH_TOKEN_EXCHANGE_FAILED: 'Failed to exchange authorization code for tokens',
+    OAUTH_USER_INFO_FAILED: 'Failed to retrieve user info from provider',
+    OAUTH_EMAIL_MISSING: 'OAuth provider did not return an email address',
+    OAUTH_CANCELLED: 'OAuth flow was cancelled by the user',
 } as const;
 
 /**

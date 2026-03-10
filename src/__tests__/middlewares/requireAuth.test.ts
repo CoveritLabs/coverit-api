@@ -102,6 +102,16 @@ describe('requireAuth middleware', () => {
 });
 
 describe('errorHandler middleware', () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        consoleErrorSpy.mockRestore();
+    });
+
     it('should return 500 for unknown errors', async () => {
         const errApp = express();
         errApp.use(express.json());
@@ -114,5 +124,6 @@ describe('errorHandler middleware', () => {
 
         expect(res.status).toBe(500);
         expect(res.body.message).toBe('Internal server error');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Unhandled error:', expect.any(Error));
     });
 });
