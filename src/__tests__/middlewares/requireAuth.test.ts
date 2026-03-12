@@ -25,6 +25,7 @@ jest.mock('@config/env', () => ({
 import app from '../../app';
 
 import express from 'express';
+import { logger } from '@services/logger.service';
 import { requireAuth } from '@api/middlewares/requireAuth';
 import { errorHandler } from '@api/middlewares/errorHandler';
 
@@ -102,14 +103,14 @@ describe('requireAuth middleware', () => {
 });
 
 describe('errorHandler middleware', () => {
-    let consoleErrorSpy: jest.SpyInstance;
+    let loggerErrorSpy: jest.SpyInstance;
 
     beforeEach(() => {
-        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        loggerErrorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
-        consoleErrorSpy.mockRestore();
+        loggerErrorSpy.mockRestore();
     });
 
     it('should return 500 for unknown errors', async () => {
@@ -124,6 +125,6 @@ describe('errorHandler middleware', () => {
 
         expect(res.status).toBe(500);
         expect(res.body.message).toBe('Internal server error');
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Unhandled error:', expect.any(Error));
+        expect(loggerErrorSpy).toHaveBeenCalledWith(expect.any(Error));
     });
 });

@@ -10,6 +10,7 @@ module.exports = {
     testMatch: ['**/__tests__/**/*.test.ts'],
     moduleFileExtensions: ['ts', 'js', 'json'],
     moduleNameMapper: {
+        '^ioredis$': '<rootDir>/src/__tests__/mocks/ioredis.ts',
         '^@api/(.*)$': '<rootDir>/src/api/$1',
         '^@config/(.*)$': '<rootDir>/src/config/$1',
         '^@lib/(.*)$': '<rootDir>/src/lib/$1',

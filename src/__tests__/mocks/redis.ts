@@ -9,6 +9,7 @@ const redis = {
     scan: jest.fn().mockResolvedValue(['0', []]),
     ping: jest.fn().mockResolvedValue('PONG'),
     on: jest.fn(),
+    disconnect: jest.fn(),
 };
 
 export async function scanKeys(pattern: string): Promise<string[]> {
