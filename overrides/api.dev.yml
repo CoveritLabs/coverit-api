@@ -10,21 +10,10 @@ services:
   api:
     image: coverit-api-dev-local
     build:
-      context: ${API_DIR}
       dockerfile: Dockerfile.dev
-      secrets:
-        - npm_token
     volumes:
       - ${API_DIR}/src:/app/src
       - ${API_DIR}/prisma:/app/prisma
       - ${API_DIR}/prisma.config.ts:/app/prisma.config.ts
       - ${API_DIR}/nodemon.json:/app/nodemon.json
       - ${API_DIR}/tsconfig.json:/app/tsconfig.json
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/coverit_dev?schema=public
-      - JWT_SECRET=dev-secret-do-not-use-in-production
-
-secrets:
-  npm_token:
-    environment: GITHUB_TOKEN
