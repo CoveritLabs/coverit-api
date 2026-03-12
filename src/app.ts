@@ -11,6 +11,7 @@ import { env } from '@config/env';
 import { swaggerSpec } from '@config/swagger';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middlewares/errorHandler';
+import { httpLogger } from '@api/middlewares/logger';
 
 const app: Application = express();
 
@@ -23,6 +24,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(httpLogger);
 
 app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
