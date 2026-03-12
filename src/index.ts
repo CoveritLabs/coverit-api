@@ -9,6 +9,8 @@ import redis from '@lib/redis';
 import { env } from '@config/env';
 
 async function startServer(): Promise<void> {
+    console.info("Starting server with env:")
+    console.info(process.env)
     console.info('Connecting to PostgreSQL…');
     try {
         await prisma.$connect();
