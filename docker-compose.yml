@@ -7,6 +7,10 @@ name: coverit
 services:
   api:
     image: ghcr.io/coveritlabs/coverit-api:${API_TAG:-dev}
+    build:
+      context: ${API_DIR}
+      secrets:
+        - npm_token
     pull_policy: always
     container_name: coverit-api
     ports:
@@ -14,9 +18,9 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-coverit}?schema=public
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - REDIS_URL=${REDIS_URL:-}
+      - JWT_SECRET=${JWT_SECRET:-}
       - JWT_ACCESS_EXPIRY=${JWT_ACCESS_EXPIRY:-15m}
       - JWT_REFRESH_EXPIRY_SECONDS=${JWT_REFRESH_EXPIRY_SECONDS:-604800}
       - RESET_TOKEN_TTL_SECONDS=${RESET_TOKEN_TTL_SECONDS:-900}
@@ -28,6 +32,7 @@ services:
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
       - GITHUB_CALLBACK_URL=${GITHUB_CALLBACK_URL:-http://localhost:3000/api/v1/auth/oauth/github/callback}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
     restart: unless-stopped
     depends_on:
       db:
@@ -65,6 +70,10 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+secrets:
+  npm_token:
+    environment: GITHUB_TOKEN
 
 volumes:
   postgres_data:

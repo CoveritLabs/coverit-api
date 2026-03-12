@@ -10,11 +10,4 @@ services:
   api:
     image: coverit-api-test-local
     build:
-      context: ${API_DIR}
       dockerfile: Dockerfile
-      secrets:
-        - npm_token
-
-secrets:
-  npm_token:
-    environment: GITHUB_TOKEN
