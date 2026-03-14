@@ -12,6 +12,11 @@ import jwt from "jsonwebtoken";
 
 jest.mock("@lib/prisma", () => require("../mocks/prisma"));
 jest.mock("@lib/redis", () => require("../mocks/redis"));
+jest.mock("@queues/email.queue", () => ({
+  emailQueue: {
+    add: jest.fn(),
+  },
+}));
 jest.mock("@config/env", () => ({
   env: {
     JWT_SECRET: "test-secret",
@@ -26,9 +31,11 @@ import prisma from "@lib/prisma";
 import redis from "@lib/redis";
 import * as authService from "@services/auth.service";
 import { verifyAccessToken } from "@utils/token";
+import { emailQueue } from "@queues/email.queue";
 
 const mockPrisma = prisma as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 const mockRedis = redis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+const mockEmailQueue = emailQueue as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -171,22 +178,37 @@ describe("authService.logout", () => {
 });
 
 describe("authService.forgotPassword", () => {
-  it("should store a hashed reset token in Redis if user exists", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      id: "uuid-1",
-      email: "a@b.com",
-      name: "Test",
-      password: "hashed",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  it("should store a hashed reset code in Redis if user exists", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "uuid-1",
+        email: "a@b.com",
+        name: "Test",
+        password: "hashed",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      mockRedis.set.mockResolvedValue("OK");
+
+      await authService.forgotPassword({ email: "a@b.com" });
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        expect.stringContaining("reset:"),
+        "uuid-1",
+        "EX",
+        900
+      );
+
+      expect(mockEmailQueue.add).toHaveBeenCalledWith(
+        "send-reset-email",
+        expect.objectContaining({
+          userId: "uuid-1",
+          email: "a@b.com",
+          name: "Test",
+          code: expect.any(String),
+        })
+      );
     });
-    mockRedis.set.mockResolvedValue("OK");
-
-    await authService.forgotPassword({ email: "a@b.com" });
-
-    expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining("reset:"), "uuid-1", "EX", 900);
-  });
-
   it("should do nothing (no throw) if user does not exist", async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
 

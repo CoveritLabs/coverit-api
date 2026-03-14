@@ -8,6 +8,11 @@ import request from 'supertest';
 jest.mock('@services/auth.service');
 jest.mock('@services/oauth.service');
 jest.mock('@config/env', () => ({ env: { OAUTH_FRONTEND_URL: 'https://app.example.com' } }));
+jest.mock("@queues/email.queue", () => ({
+  emailQueue: {
+    add: jest.fn(),
+  },
+}));
 
 import * as authService from '@services/auth.service';
 import * as oauthService from '@services/oauth.service';

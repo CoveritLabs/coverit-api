@@ -11,6 +11,11 @@ import request from "supertest";
 
 jest.mock("@lib/prisma", () => require("../mocks/prisma"));
 jest.mock("@lib/redis", () => require("../mocks/redis"));
+jest.mock("@queues/email.queue", () => ({
+  emailQueue: {
+    add: jest.fn(),
+  },
+}));
 jest.mock("@config/env", () => ({
   env: {
     NODE_ENV: "test",
