@@ -8,6 +8,7 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL ?? "",
   REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
   CORS_ORIGINS: (process.env.CORS_ORIGINS ?? "http://localhost:5173").split(","),
+  CORS_CREDENTIALS: process.env.CORS_CREDENTIALS ?? "true",
   JWT_SECRET: process.env.JWT_SECRET ?? "",
   JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY ?? "15m",
   JWT_REFRESH_EXPIRY_SECONDS: parseInt(process.env.JWT_REFRESH_EXPIRY_SECONDS ?? "604800", 10), // 7 days
@@ -28,3 +29,27 @@ export const env = {
   RESET_PASSWORD_EMAIL: process.env.RESET_PASSWORD_EMAIL ?? "Coverit <support@updates.coverit.cyou>",
   RESET_PASSWORD_TEMPLATE_ID: process.env.RESET_PASSWORD_TEMPLATE_ID ?? "",
 } as const;
+
+console.info("Loaded environment variables:", {
+  NODE_ENV: env.NODE_ENV,
+  PORT: env.PORT,
+  DATABASE_URL: env.DATABASE_URL ? "****" : "(not set)",
+  REDIS_URL: env.REDIS_URL ? "****" : "(not set)",
+  CORS_ORIGINS: env.CORS_ORIGINS,
+  CORS_CREDENTIALS: env.CORS_CREDENTIALS,
+  JWT_SECRET: env.JWT_SECRET ? "****" : "(not set)",
+  JWT_ACCESS_EXPIRY: env.JWT_ACCESS_EXPIRY,
+  JWT_REFRESH_EXPIRY_SECONDS: env.JWT_REFRESH_EXPIRY_SECONDS,
+  RESET_CODE_TTL_SECONDS: env.RESET_CODE_TTL_SECONDS,
+  API_PREFIX: env.API_PREFIX,
+  OAUTH_FRONTEND_URL: env.OAUTH_FRONTEND_URL,
+  GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
+  GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? "****" : "(not set)",
+  GOOGLE_CALLBACK_URL: env.GOOGLE_CALLBACK_URL,
+  GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID ? "****" : "(not set)",
+  GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET ? "****" : "(not set)",
+  GITHUB_CALLBACK_URL: env.GITHUB_CALLBACK_URL,
+  RESEND_API_KEY: env.RESEND_API_KEY ? "****" : "(not set)",
+  RESET_PASSWORD_EMAIL: env.RESET_PASSWORD_EMAIL,
+  RESET_PASSWORD_TEMPLATE_ID: env.RESET_PASSWORD_TEMPLATE_ID ? "****" : "(not set)",
+});

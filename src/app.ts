@@ -17,12 +17,20 @@ import "@workers/email.worker"
 const app: Application = express();
 
 app.use(helmet());
-app.use(
-    cors({
-        origin: env.CORS_ORIGINS,
-        credentials: true,
-    }),
-);
+
+const allowedOrigins = env.CORS_ORIGINS;
+const corsOptions = {
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!requestOrigin) return callback(null, true);
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: env.CORS_CREDENTIALS === 'true',
+    optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(httpLogger);
