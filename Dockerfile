@@ -40,4 +40,4 @@ EXPOSE 3000
 
 USER node
 
-CMD ["sh", "-c", "npx prisma db push && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
