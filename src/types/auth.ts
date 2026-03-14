@@ -7,6 +7,7 @@ export type OAuthProvider = 'google' | 'github';
 export interface OAuthUserProfile {
     email: string;
     name: string;
+    providerAccountId: string;
 }
 
 export interface OAuthProviderConfig {

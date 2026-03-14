@@ -19,6 +19,8 @@ module.exports = {
         '^@models/(.*)$': '<rootDir>/src/models/$1',
         '^@constants/(.*)$': '<rootDir>/src/constants/$1',
         '^@generated/(.*)$': '<rootDir>/src/generated/$1',
+        '^@queues/(.*)$': '<rootDir>/src/queues/$1',
+        '^@workers/(.*)$': '<rootDir>/src/workers/$1',
     },
     clearMocks: true,
     collectCoverageFrom: [

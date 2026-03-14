@@ -60,25 +60,34 @@ describe('oauth.service', () => {
     test('exchangeCodeForProfile returns google profile on success', async () => {
         fetchSpy = jest.spyOn(global as any, 'fetch')
             .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ access_token: 'tok' }) }))
-            .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ email: 'a@example.com', name: 'Alice' }) }));
+            .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ email: 'a@example.com', name: 'Alice', id: 'google-123' }) }));
 
         const profile = await exchangeCodeForProfile('google', 'code');
         expect(profile.email).toBe('a@example.com');
         expect(profile.name).toBe('Alice');
+        expect(profile.providerAccountId).toBe('google-123');
     });
 
     test('exchangeCodeForProfile returns github profile using emails endpoint when necessary', async () => {
         fetchSpy = jest.spyOn(global as any, 'fetch')
             .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ access_token: 'gh-token' }) }))
-            .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ email: null, login: 'octocat', name: null }) }))
+            .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ email: null, login: 'octocat', name: null, id: 12345 }) }))
             .mockImplementationOnce(async () => ({ ok: true, json: async () => ([{ email: 'gh@example.com', primary: true, verified: true }]) }));
 
         const profile = await exchangeCodeForProfile('github', 'code');
         expect(profile.email).toBe('gh@example.com');
         expect(profile.name).toBe('octocat');
+        expect(profile.providerAccountId).toBe('12345');
     });
 
     test('exchangeCodeForProfile throws when google userinfo endpoint fails', async () => {
+        fetchSpy = jest.spyOn(global as any, 'fetch')
+            .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ token_type: 'bearer' }) }));
+
+        await expect(exchangeCodeForProfile('google', 'code')).rejects.toThrow(BadRequestError);
+    });
+
+    test('exchangeCodeForProfile throws when google userinfo endpoint fails2', async () => {
         fetchSpy = jest.spyOn(global as any, 'fetch')
             .mockImplementationOnce(async () => ({ ok: true, json: async () => ({ access_token: 'tok' }) }))
             .mockImplementationOnce(async () => ({ ok: false }));

@@ -11,6 +11,7 @@ import { AUTH_MESSAGES } from '@constants/messages';
 import { VALID_PROVIDERS } from '@constants/auth';
 import { StatusCodes } from 'http-status-codes';
 import { env } from '@config/env';
+import { buildRedirectUrl } from '@utils/redirect';
 
 
 export async function signup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -110,7 +111,7 @@ export async function oauthCallback(req: Request, res: Response, next: NextFunct
             const msg = oauthError === 'access_denied'
                 ? AUTH_MESSAGES.OAUTH_CANCELLED
                 : AUTH_MESSAGES.OAUTH_CODE_MISSING;
-            const errorRedirect = `${env.OAUTH_FRONTEND_URL}/login?error=${encodeURIComponent(msg)}`;
+            const errorRedirect = buildRedirectUrl(env.FRONTEND_URL, '/login', { error: msg });
             res.redirect(errorRedirect);
             return;
         }
@@ -127,10 +128,11 @@ export async function oauthCallback(req: Request, res: Response, next: NextFunct
             name: loginResponse.user!.name,
         });
 
-        res.redirect(`${env.OAUTH_FRONTEND_URL}/oauth/callback?${params.toString()}`);
+        const redirectUrl = buildRedirectUrl(env.FRONTEND_URL, '/oauth/callback', params);
+        res.redirect(redirectUrl);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'OAuth login failed';
-        const errorRedirect = `${env.OAUTH_FRONTEND_URL}/login?error=${encodeURIComponent(message)}`;
+        const errorRedirect = buildRedirectUrl(env.FRONTEND_URL, '/login', { error: message });
         res.redirect(errorRedirect);
     }
 }
