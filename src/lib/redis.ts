@@ -14,6 +14,10 @@ const redis = new Redis(env.REDIS_URL, {
     },
 });
 
+const workerRedis = new Redis(env.REDIS_URL, {
+  maxRetriesPerRequest: null,
+});
+
 redis.on('error', (err) => {
     console.error('Redis connection error:', err.message);
 });
@@ -40,3 +44,4 @@ export async function scanKeys(pattern: string): Promise<string[]> {
 }
 
 export default redis;
+export { workerRedis };

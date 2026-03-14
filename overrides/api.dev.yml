@@ -3,7 +3,7 @@
 # See LICENSE file in the project root for full license information.
 
 # Modular override for API development with hot-reload
-# Inherits JWT_ACCESS_EXPIRY, JWT_REFRESH_EXPIRY_SECONDS, RESET_TOKEN_TTL_SECONDS,
+# Inherits JWT_ACCESS_EXPIRY, JWT_REFRESH_EXPIRY_SECONDS, RESET_CODE_TTL_SECONDS,
 # REDIS_URL, and CORS_ORIGINS from the base docker-compose.yml.
 
 services:

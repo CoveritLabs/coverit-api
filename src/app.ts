@@ -12,6 +12,7 @@ import { swaggerSpec } from '@config/swagger';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middlewares/errorHandler';
 import { httpLogger } from '@api/middlewares/logger';
+import "@workers/email.worker"
 
 const app: Application = express();
 

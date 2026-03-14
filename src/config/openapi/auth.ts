@@ -105,6 +105,6 @@ registry.registerPath({
     request: { body: { content: { 'application/json': { schema: ResetPasswordRequestSchema } } } },
     responses: {
         200: { description: 'Password reset successfully', content: { 'application/json': { schema: MessageResponseSchema } } },
-        400: { description: 'Invalid or expired reset token', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        400: { description: 'Invalid or expired reset code', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
 });
