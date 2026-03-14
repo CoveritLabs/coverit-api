@@ -8,7 +8,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(env.RESEND_API_KEY);
 
-export async function sendResetEmail(email: string, code: string, name: string): Promise<void> {
+export async function sendResetEmail(email: string, resetUrl: string, name: string): Promise<void> {
   const from = env.RESET_PASSWORD_EMAIL;
   const templateId = env.RESET_PASSWORD_TEMPLATE_ID;
 
@@ -20,8 +20,8 @@ export async function sendResetEmail(email: string, code: string, name: string):
       id: templateId,
       variables: {
         NAME: name,
-        CODE: code,
-        EXPIRE_TIME: Math.ceil(env.RESET_CODE_TTL_SECONDS / 60),
+        RESET_URL: resetUrl,
+        EXPIRE_TIME: Math.ceil(env.RESET_TOKEN_TTL_SECONDS / 60),
       },
     },
   });

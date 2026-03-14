@@ -11,8 +11,8 @@ new Worker(
   "email",
   async (job) => {
     if (job.name === "send-reset-email") {
-      const { email, code, name } = job.data;
-      await sendResetEmail(email, code, name);
+      const { email, resetUrl, name } = job.data;
+      await sendResetEmail(email, resetUrl, name);
     }
   },
   { connection: workerRedis },

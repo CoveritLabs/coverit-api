@@ -25,7 +25,7 @@ export const AUTH_MESSAGES = {
 
   // reset-password
   RESET_PASSWORD_SUCCESS: "Password reset successfully",
-  RESET_CODE_INVALID: "Invalid or expired reset code",
+  RESET_TOKEN_INVALID: "Invalid or expired reset token",
 
   // oauth
   UNSUPPORTED_OAUTH_PROVIDER: "Unsupported OAuth provider",
@@ -46,5 +46,5 @@ export const AUTH_VALIDATION = {
   PASSWORD_REQUIRED: "Password is required",
   NAME_REQUIRED: "Name is required",
   REFRESH_TOKEN_REQUIRED: "Refresh token is required",
-  RESET_CODE_REQUIRED: "Reset code is required",
+  RESET_TOKEN_REQUIRED: "Reset token is required",
 } as const;

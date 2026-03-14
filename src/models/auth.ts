@@ -44,7 +44,7 @@ export const ForgotPasswordRequestSchema = z.object({
 }) satisfies ZodType<ForgotPasswordRequest>;
 
 export const ResetPasswordRequestSchema = z.object({
-  token: z.requiredString(AUTH_VALIDATION.RESET_CODE_REQUIRED),
+  token: z.requiredString(AUTH_VALIDATION.RESET_TOKEN_REQUIRED),
   newPassword: z.requiredString(AUTH_VALIDATION.PASSWORD_REQUIRED).min(8, AUTH_VALIDATION.PASSWORD_MIN_LENGTH),
 }) satisfies ZodType<ResetPasswordRequest>;
 

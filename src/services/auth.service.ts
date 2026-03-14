@@ -3,8 +3,10 @@
 // See LICENSE file in the project root for full license information.
 
 import argon2 from "argon2";
+import crypto from "crypto";
 
 import { env } from "@config/env";
+import { buildRedirectUrl } from "@utils/redirect";
 import prisma from "@lib/prisma";
 import redis, { refreshKey, refreshPattern, resetKey, scanKeys } from "@lib/redis";
 import { emailQueue } from "@queues/email.queue";
@@ -104,27 +106,28 @@ export async function forgotPassword(input: ForgotPasswordRequest): Promise<void
   const user = await prisma.user.findUnique({ where: { email: input.email } });
   if (!user) return;
 
-  const rawCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashedCode = hashToken(rawCode);
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = hashToken(rawToken);
 
-  await redis.set(resetKey(hashedCode), user.id, "EX", env.RESET_CODE_TTL_SECONDS);
+  await redis.set(resetKey(hashedToken), user.id, "EX", env.RESET_TOKEN_TTL_SECONDS);
 
-  // TODO: replace with email job enqueue
-  logger.info(`[job:email] Enqueue password-reset email for userId=${user.id} code=${rawCode}`);
+  const resetUrl = buildRedirectUrl(env.FRONTEND_URL, "/reset-password", { token: rawToken });
+
+  logger.info(`[job:email] Enqueue password-reset email for userId=${user.id}`);
   await emailQueue.add("send-reset-email", {
     userId: user.id,
     email: user.email,
-    code: rawCode,
     name: user.name,
+    resetUrl,
   });
 }
 
 export async function resetPassword(input: ResetPasswordRequest): Promise<MessageResponse> {
-  const hashedCode = hashToken(input.token);
-  const userId = await redis.get(resetKey(hashedCode));
+  const hashedToken = hashToken(input.token);
+  const userId = await redis.get(resetKey(hashedToken));
 
   if (!userId) {
-    throw new BadRequestError(AUTH_MESSAGES.RESET_CODE_INVALID);
+    throw new BadRequestError(AUTH_MESSAGES.RESET_TOKEN_INVALID);
   }
 
   const hashedPassword = await argon2.hash(input.newPassword);
@@ -134,7 +137,7 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
     data: { password: hashedPassword },
   });
 
-  await redis.del(resetKey(hashedCode));
+  await redis.del(resetKey(hashedToken));
 
   const refreshKeys = await scanKeys(refreshPattern(userId));
   if (refreshKeys.length > 0) {

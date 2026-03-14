@@ -12,7 +12,7 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET ?? "",
   JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY ?? "15m",
   JWT_REFRESH_EXPIRY_SECONDS: parseInt(process.env.JWT_REFRESH_EXPIRY_SECONDS ?? "604800", 10), // 7 days
-  RESET_CODE_TTL_SECONDS: parseInt(process.env.RESET_CODE_TTL_SECONDS ?? "900", 10), // 15 min
+  RESET_TOKEN_TTL_SECONDS: parseInt(process.env.RESET_TOKEN_TTL_SECONDS ?? "900", 10), // 15 min
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
 
   // OAuth
@@ -40,7 +40,7 @@ console.info("Loaded environment variables:", {
   JWT_SECRET: env.JWT_SECRET ? "****" : "(not set)",
   JWT_ACCESS_EXPIRY: env.JWT_ACCESS_EXPIRY,
   JWT_REFRESH_EXPIRY_SECONDS: env.JWT_REFRESH_EXPIRY_SECONDS,
-  RESET_CODE_TTL_SECONDS: env.RESET_CODE_TTL_SECONDS,
+  RESET_TOKEN_TTL_SECONDS: env.RESET_TOKEN_TTL_SECONDS,
   API_PREFIX: env.API_PREFIX,
   FRONTEND_URL: env.FRONTEND_URL,
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
