@@ -110,7 +110,7 @@ export async function oauthCallback(req: Request, res: Response, next: NextFunct
             const msg = oauthError === 'access_denied'
                 ? AUTH_MESSAGES.OAUTH_CANCELLED
                 : AUTH_MESSAGES.OAUTH_CODE_MISSING;
-            const errorRedirect = `${env.OAUTH_FRONTEND_URL}/login?error=${encodeURIComponent(msg)}`;
+            const errorRedirect = `${env.FRONTEND_URL}/login?error=${encodeURIComponent(msg)}`;
             res.redirect(errorRedirect);
             return;
         }
@@ -127,10 +127,10 @@ export async function oauthCallback(req: Request, res: Response, next: NextFunct
             name: loginResponse.user!.name,
         });
 
-        res.redirect(`${env.OAUTH_FRONTEND_URL}/oauth/callback?${params.toString()}`);
+        res.redirect(`${env.FRONTEND_URL}/oauth/callback?${params.toString()}`);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'OAuth login failed';
-        const errorRedirect = `${env.OAUTH_FRONTEND_URL}/login?error=${encodeURIComponent(message)}`;
+        const errorRedirect = `${env.FRONTEND_URL}/login?error=${encodeURIComponent(message)}`;
         res.redirect(errorRedirect);
     }
 }

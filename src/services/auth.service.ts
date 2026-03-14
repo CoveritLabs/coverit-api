@@ -146,17 +146,42 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
 
 export async function oauthLogin(
   provider: OAuthProvider,
-  profile: { email: string; name: string },
+  profile: { email: string; name: string; providerAccountId: string },
 ): Promise<LoginResponse> {
   let user = await prisma.user.findUnique({ where: { email: profile.email } });
 
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: profile.email,
-        name: profile.name,
-        provider,
-      },
+  if (user) {
+    const existingAccount = await prisma.account.findFirst({
+      where: { userId: user.id, provider },
+    });
+
+    if (!existingAccount) {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          provider,
+          providerAccountId: profile.providerAccountId,
+        },
+      });
+    }
+  } else {
+    user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email: profile.email,
+          name: profile.name,
+        },
+      });
+
+      await tx.account.create({
+        data: {
+          userId: newUser.id,
+          provider,
+          providerAccountId: profile.providerAccountId,
+        },
+      });
+
+      return newUser;
     });
   }
 

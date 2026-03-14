@@ -16,7 +16,7 @@ export const env = {
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
 
   // OAuth
-  OAUTH_FRONTEND_URL: process.env.OAUTH_FRONTEND_URL ?? "http://localhost:5173",
+  FRONTEND_URL: process.env.FRONTEND_URL ?? "http://localhost:5173",
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? "",
   GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL ?? "http://localhost:3000/api/v1/auth/oauth/google/callback",
@@ -42,7 +42,7 @@ console.info("Loaded environment variables:", {
   JWT_REFRESH_EXPIRY_SECONDS: env.JWT_REFRESH_EXPIRY_SECONDS,
   RESET_CODE_TTL_SECONDS: env.RESET_CODE_TTL_SECONDS,
   API_PREFIX: env.API_PREFIX,
-  OAUTH_FRONTEND_URL: env.OAUTH_FRONTEND_URL,
+  FRONTEND_URL: env.FRONTEND_URL,
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
   GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? "****" : "(not set)",
   GOOGLE_CALLBACK_URL: env.GOOGLE_CALLBACK_URL,

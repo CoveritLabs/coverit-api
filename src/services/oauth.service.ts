@@ -116,7 +116,7 @@ async function fetchGoogleProfile(accessToken: string): Promise<OAuthUserProfile
         throw new BadRequestError(AUTH_MESSAGES.OAUTH_EMAIL_MISSING);
     }
 
-    return { email: data.email, name: data.name ?? data.email };
+    return { email: data.email, name: data.name ?? data.email, providerAccountId: data.id };
 }
 
 async function fetchGitHubProfile(accessToken: string): Promise<OAuthUserProfile> {
@@ -146,5 +146,5 @@ async function fetchGitHubProfile(accessToken: string): Promise<OAuthUserProfile
         throw new BadRequestError(AUTH_MESSAGES.OAUTH_EMAIL_MISSING);
     }
 
-    return { email, name: (userData.name ?? userData.login ?? email) as string };
+    return { email, name: (userData.name ?? userData.login ?? email) as string, providerAccountId: String(userData.id) };
 }
