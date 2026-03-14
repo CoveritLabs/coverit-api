@@ -22,7 +22,8 @@ jest.mock("@config/env", () => ({
     JWT_SECRET: "test-secret",
     JWT_ACCESS_EXPIRY: "15m",
     JWT_REFRESH_EXPIRY_SECONDS: 604800,
-    RESET_CODE_TTL_SECONDS: 900,
+    RESET_TOKEN_TTL_SECONDS: 3600,
+    FRONTEND_URL: "https://app.example.com",
   },
 }));
 
@@ -178,37 +179,56 @@ describe("authService.logout", () => {
 });
 
 describe("authService.forgotPassword", () => {
-  it("should store a hashed reset code in Redis if user exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: "uuid-1",
+  it("should store a hashed reset token in Redis and enqueue email when user has a password", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "uuid-1",
+      email: "a@b.com",
+      name: "Test",
+      password: "hashed",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    mockRedis.set.mockResolvedValue("OK");
+
+    await authService.forgotPassword({ email: "a@b.com" });
+
+    expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining("reset:"), "uuid-1", "EX", 3600);
+
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "send-reset-email",
+      expect.objectContaining({
+        userId: "uuid-1",
         email: "a@b.com",
         name: "Test",
-        password: "hashed",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+        resetUrl: expect.stringContaining("https://app.example.com/reset-password?token="),
+      }),
+    );
+  });
 
-      mockRedis.set.mockResolvedValue("OK");
-
-      await authService.forgotPassword({ email: "a@b.com" });
-
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        expect.stringContaining("reset:"),
-        "uuid-1",
-        "EX",
-        900
-      );
-
-      expect(mockEmailQueue.add).toHaveBeenCalledWith(
-        "send-reset-email",
-        expect.objectContaining({
-          userId: "uuid-1",
-          email: "a@b.com",
-          name: "Test",
-          code: expect.any(String),
-        })
-      );
+  it("should store a hashed reset token in Redis and enqueue email when use has no password", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "uuid-1",
+      email: "oauth@b.com",
+      name: "OAuth User",
+      password: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
+
+    await authService.forgotPassword({ email: "oauth@b.com" });
+
+    expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining("reset:"), "uuid-1", "EX", 3600);
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "send-reset-email",
+      expect.objectContaining({
+        userId: "uuid-1",
+        email: "oauth@b.com",
+        name: "OAuth User",
+        resetUrl: expect.stringContaining("https://app.example.com/reset-password?token="),
+      }),
+    );
+  });
+
   it("should do nothing (no throw) if user does not exist", async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
 
@@ -218,7 +238,7 @@ describe("authService.forgotPassword", () => {
 });
 
 describe("authService.resetPassword", () => {
-  it("should update password, delete reset token, and purge all refresh tokens", async () => {
+  it("should update password, delete reset token from Redis, and purge all refresh tokens", async () => {
     const rawToken = "reset-token-raw";
     const hashed = hashToken(rawToken);
 
@@ -248,8 +268,8 @@ describe("authService.resetPassword", () => {
   it("should throw BadRequestError if reset token not found in Redis", async () => {
     mockRedis.get.mockResolvedValue(null);
 
-    await expect(authService.resetPassword({ token: "expired-token", newPassword: "NewP@ss1" })).rejects.toThrow(
-      AUTH_MESSAGES.RESET_CODE_INVALID,
+    await expect(authService.resetPassword({ token: "bad-token", newPassword: "NewP@ss1" })).rejects.toThrow(
+      AUTH_MESSAGES.RESET_TOKEN_INVALID,
     );
   });
 });
@@ -277,41 +297,94 @@ describe("verifyAccessToken", () => {
 });
 
 describe("authService.oauthLogin", () => {
-  it("should create a new user when none exists and return tokens", async () => {
+  it("should create a new user and account when none exists and return tokens", async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
     mockPrisma.user.create.mockResolvedValue({
       id: "uuid-2",
       email: "oauth@user.com",
       name: "OAuth User",
-      provider: "google",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    mockPrisma.account.create.mockResolvedValue({
+      id: "acc-1",
+      userId: "uuid-2",
+      provider: "google",
+      providerAccountId: "google-id-123",
+    });
     mockRedis.set.mockResolvedValue("OK");
 
-    const res = await authService.oauthLogin("google", { email: "oauth@user.com", name: "OAuth User" });
+    const res = await authService.oauthLogin("google", {
+      email: "oauth@user.com",
+      name: "OAuth User",
+      providerAccountId: "google-id-123",
+    });
 
+    expect(mockPrisma.$transaction).toHaveBeenCalled();
     expect(mockPrisma.user.create).toHaveBeenCalled();
+    expect(mockPrisma.account.create).toHaveBeenCalled();
     expect(res.user).toEqual({ id: "uuid-2", email: "oauth@user.com", name: "OAuth User" });
     expect(res.tokens?.accessToken).toBeDefined();
     expect(res.tokens?.refreshToken).toBeDefined();
     expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining("refresh:uuid-2:"), "1", "EX", 604800);
   });
 
-  it("should use existing user when found and return tokens", async () => {
+  it("should link a new account when user exists but has no account for this provider", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: "uuid-3",
       email: "exist@user.com",
       name: "Existing",
     });
+    mockPrisma.account.findFirst.mockResolvedValue(null);
+    mockPrisma.account.create.mockResolvedValue({
+      id: "acc-2",
+      userId: "uuid-3",
+      provider: "google",
+      providerAccountId: "google-id-456",
+    });
     mockRedis.set.mockResolvedValue("OK");
 
-    const res = await authService.oauthLogin("google", { email: "exist@user.com", name: "Existing" });
+    const res = await authService.oauthLogin("google", {
+      email: "exist@user.com",
+      name: "Existing",
+      providerAccountId: "google-id-456",
+    });
 
     expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    expect(mockPrisma.account.findFirst).toHaveBeenCalledWith({
+      where: { userId: "uuid-3", provider: "google" },
+    });
+    expect(mockPrisma.account.create).toHaveBeenCalledWith({
+      data: { userId: "uuid-3", provider: "google", providerAccountId: "google-id-456" },
+    });
+    expect(res.user).toEqual({ id: "uuid-3", email: "exist@user.com", name: "Existing" });
+    expect(res.tokens?.accessToken).toBeDefined();
+  });
+
+  it("should just log in when user and account already exist", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "uuid-3",
+      email: "exist@user.com",
+      name: "Existing",
+    });
+    mockPrisma.account.findFirst.mockResolvedValue({
+      id: "acc-2",
+      userId: "uuid-3",
+      provider: "google",
+      providerAccountId: "google-id-456",
+    });
+    mockRedis.set.mockResolvedValue("OK");
+
+    const res = await authService.oauthLogin("google", {
+      email: "exist@user.com",
+      name: "Existing",
+      providerAccountId: "google-id-456",
+    });
+
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    expect(mockPrisma.account.create).not.toHaveBeenCalled();
     expect(res.user).toEqual({ id: "uuid-3", email: "exist@user.com", name: "Existing" });
     expect(res.tokens?.accessToken).toBeDefined();
     expect(res.tokens?.refreshToken).toBeDefined();
-    expect(mockRedis.set).toHaveBeenCalledWith(expect.stringContaining("refresh:uuid-3:"), "1", "EX", 604800);
   });
 });

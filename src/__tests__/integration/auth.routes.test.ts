@@ -29,10 +29,11 @@ jest.mock("@config/env", () => ({
     JWT_SECRET: "test-secret",
     JWT_ACCESS_EXPIRY: "15m",
     JWT_REFRESH_EXPIRY_SECONDS: 604800,
-    RESET_CODE_TTL_SECONDS: 900,
+    RESET_TOKEN_TTL_SECONDS: 3600,
     API_PREFIX: "/api/v1",
     RESEND_API_KEY: "test-key",
     RESET_PASSWORD_EMAIL: "test@test.com",
+    FRONTEND_URL: "https://app.example.com",
   },
 }));
 
@@ -270,8 +271,8 @@ describe("POST /auth/forgot-password", () => {
 describe("POST /auth/reset-password", () => {
   it("should return 200 on successful password reset", async () => {
     const crypto = require("crypto");
-    const rawCode = "123456";
-    const hashed = crypto.createHash("sha256").update(rawCode).digest("hex");
+    const rawToken = "secure-reset-token";
+    const hashed = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     mockRedis.get.mockResolvedValue("uuid-1");
     mockArgon2.hash.mockResolvedValue("$argon2-new-hashed");
@@ -288,14 +289,14 @@ describe("POST /auth/reset-password", () => {
 
     const res = await request(app)
       .post(`${BASE}/reset-password`)
-      .send({ token: rawCode, newPassword: "NewP@ssword1" });
+      .send({ token: rawToken, newPassword: "NewP@ssword1" });
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe(AUTH_MESSAGES.RESET_PASSWORD_SUCCESS);
     expect(mockRedis.get).toHaveBeenCalledWith(`reset:${hashed}`);
   });
 
-  it("should return 400 for expired/invalid reset code", async () => {
+  it("should return 400 for invalid reset token", async () => {
     mockRedis.get.mockResolvedValue(null);
 
     const res = await request(app)
@@ -303,13 +304,13 @@ describe("POST /auth/reset-password", () => {
       .send({ token: "000000", newPassword: "NewP@ssword1" });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe(AUTH_MESSAGES.RESET_CODE_INVALID);
+    expect(res.body.message).toBe(AUTH_MESSAGES.RESET_TOKEN_INVALID);
   });
 
   it("should purge all refresh tokens (global logout) after reset", async () => {
     const crypto = require("crypto");
-    const rawCode = "654321";
-    const hashed = crypto.createHash("sha256").update(rawCode).digest("hex");
+    const rawToken = "another-reset-token";
+    const hashed = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     mockRedis.get.mockResolvedValue("uuid-1");
     mockArgon2.hash.mockResolvedValue("$argon2-new");
@@ -326,7 +327,7 @@ describe("POST /auth/reset-password", () => {
 
     await request(app)
       .post(`${BASE}/reset-password`)
-      .send({ token: rawCode, newPassword: "NewP@ss1" });
+      .send({ token: rawToken, newPassword: "NewP@ss1" });
 
     expect(mockRedis.del).toHaveBeenCalledWith(`reset:${hashed}`);
     expect(mockRedis.del).toHaveBeenCalledWith("refresh:uuid-1:abc");

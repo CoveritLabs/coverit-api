@@ -23,7 +23,7 @@ jest.mock("@config/env", () => ({
     JWT_SECRET: "test-secret",
     JWT_ACCESS_EXPIRY: "15m",
     JWT_REFRESH_EXPIRY_SECONDS: 604800,
-    RESET_CODE_TTL_SECONDS: 900,
+    RESET_TOKEN_TTL_SECONDS: 3600,
   },
 }));
 
