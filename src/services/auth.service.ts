@@ -12,16 +12,8 @@ import redis, { refreshKey, refreshPattern, resetKey, scanKeys } from "@lib/redi
 import { emailQueue } from "@queues/email.queue";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@utils/errors";
 import { generateAccessToken, generateRefreshToken, hashToken } from "@utils/token";
-
 import { AUTH_MESSAGES } from "@constants/messages";
-import type {
-  ForgotPasswordRequest,
-  LoginRequest,
-  LoginResponse,
-  RefreshResponse,
-  ResetPasswordRequest,
-  SignupRequest,
-} from "@models/auth";
+import type { ForgotPasswordRequest, LoginRequest, LoginResponse, RefreshResponse, ResetPasswordRequest, SignupRequest } from "@models/auth";
 import type { MessageResponse } from "@models/common";
 import { logger } from "@services/logger.service";
 import type { OAuthProvider } from "types/auth";
