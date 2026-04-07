@@ -39,6 +39,10 @@ model Account {
   @@map("accounts")
 }
 
+//////////
+// Project
+//////////
+
 model Project {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique
@@ -47,6 +51,7 @@ model Project {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   members ProjectMember[]
+  targetApplications TargetApplication[]
 
   @@map("projects")
 }
@@ -70,4 +75,55 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@map("project_members")
+}
+
+/////////////////////
+// Target Application
+/////////////////////
+
+model TargetApplication {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  baseUrl   String   @map("base_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions TargetApplicationVersion[]
+  regressionCodebases RegressionCodebase[]
+
+  @@unique([projectId, name])
+  @@map("target_applications")
+}
+
+model TargetApplicationVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  targetApplicationId String   @map("target_application_id") @db.Uuid
+  version             String
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+
+  @@unique([targetApplicationId, version])
+  @@map("target_application_versions")
+}
+
+//////////////////////
+// Regression Codebase
+//////////////////////
+
+model RegressionCodebase {
+  id                   String   @id @default(uuid()) @db.Uuid
+  targetApplicationId  String   @map("target_application_id") @db.Uuid
+  frameworkName        String   @map("framework_name")
+  repositoryUrl        String   @map("repository_url")
+  apiKey               String?  @map("api_key")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  @@map("regression_codebases")
+  @@unique([targetApplicationId, repositoryUrl])
 }
