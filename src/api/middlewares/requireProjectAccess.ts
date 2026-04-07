@@ -8,37 +8,45 @@ import { PROJECT_MESSAGES } from "@constants/messages";
 import { ForbiddenError } from "@utils/errors";
 import * as projectService from "@services/project.service";
 import { getCurrentUserId } from "@api/middlewares/requireAuth";
+import { ProjectRole } from "@models/project";
 
-export async function requireProjectMember(req: Request, _res: Response, next: NextFunction): Promise<void> {
+const ROLE_PRIORITY: Record<ProjectRole, number> = {
+  VIEWER: 0,
+  MEMBER: 1,
+  ADMIN: 2,
+};
+
+async function requireProjectRole(minRole: ProjectRole, req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = getCurrentUserId(req);
     const { projectId } = req.params;
 
-    const member = await projectService.isMember(projectId, userId);
-    if (member) {
-      next();
+    const role = await projectService.getMemberRole(projectId, userId);
+    if (!role) {
+      next(new ForbiddenError(PROJECT_MESSAGES.MEMBER_REQUIRED));
       return;
     }
 
-    next(new ForbiddenError(PROJECT_MESSAGES.MEMBER_REQUIRED));
+    if (ROLE_PRIORITY[role] < ROLE_PRIORITY[minRole]) {
+      const msg = minRole === ProjectRole.ADMIN ? PROJECT_MESSAGES.ADMIN_REQUIRED : PROJECT_MESSAGES.MEMBER_REQUIRED;
+      next(new ForbiddenError(msg));
+      return;
+    }
+
+    next();
   } catch (err) {
     next(err);
   }
 }
 
-export async function requireProjectAdmin(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = getCurrentUserId(req);
-    const { projectId } = req.params;
+export function requireProjectMembership(req: Request, res: Response, next: NextFunction) {
+  return requireProjectRole(ProjectRole.VIEWER, req, res, next);
+}
 
-    const admin = await projectService.isAdmin(projectId, userId);
-    if (admin) {
-      next();
-      return;
-    }
+export function requireProjectMember(req: Request, res: Response, next: NextFunction) {
+  return requireProjectRole(ProjectRole.MEMBER, req, res, next);
+}
 
-    next(new ForbiddenError(PROJECT_MESSAGES.ADMIN_REQUIRED));
-  } catch (err) {
-    next(err);
-  }
+export function requireProjectAdmin(req: Request, res: Response, next: NextFunction) {
+  return requireProjectRole(ProjectRole.ADMIN, req, res, next);
 }

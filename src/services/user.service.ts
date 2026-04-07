@@ -4,13 +4,14 @@
 
 import prisma from "@lib/prisma";
 import { BadRequestError, NotFoundError, ForbiddenError } from "@utils/errors";
+import { USER_MESSAGES } from "@constants/messages";
 import type { UserInfo } from "@models/user";
 import type { MessageResponse } from "@models/common";
 
 export async function getUser(userId: string): Promise<UserInfo> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError(USER_MESSAGES.NOT_FOUND);
   }
 
   return {
@@ -23,7 +24,7 @@ export async function getUser(userId: string): Promise<UserInfo> {
 export async function updateUser(userId: string, input: { name?: string; email?: string }): Promise<MessageResponse> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError(USER_MESSAGES.NOT_FOUND);
   }
 
   const data: { name?: string; email?: string } = {};
@@ -33,25 +34,25 @@ export async function updateUser(userId: string, input: { name?: string; email?:
   if (input.email) {
     const existingUser = await prisma.user.findUnique({ where: { email: input.email } });
     if (existingUser && existingUser.id !== userId) {
-      throw new BadRequestError("Email is already in use");
+      throw new BadRequestError(USER_MESSAGES.EMAIL_IN_USE);
     }
     data.email = input.email;
   }
 
   await prisma.user.update({ where: { id: userId }, data });
 
-  return { message: "User updated successfully" };
+  return { message: USER_MESSAGES.UPDATE_SUCCESS };
 }
 
 export async function deleteUser(userId: string): Promise<MessageResponse> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError(USER_MESSAGES.NOT_FOUND);
   }
 
   await prisma.user.delete({ where: { id: userId } });
 
-  return { message: "User deleted successfully" };
+  return { message: USER_MESSAGES.DELETE_SUCCESS };
 }
 
 export async function getUsersByEmails(emails: string[]): Promise<UserInfo[]> {

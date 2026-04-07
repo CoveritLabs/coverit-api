@@ -45,18 +45,11 @@ async function assertProjectExists(projectId: string) {
   return project;
 }
 
-export async function isMember(projectId: string, userId: string): Promise<boolean> {
+export async function getMemberRole(projectId: string, userId: string): Promise<ProjectRole | null> {
   await assertProjectExists(projectId);
 
   const membership = await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId, userId } } });
-  return !!membership;
-}
-
-export async function isAdmin(projectId: string, userId: string): Promise<boolean> {
-  await assertProjectExists(projectId);
-
-  const membership = await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId, userId } } });
-  return membership?.role === ProjectRole.ADMIN;
+  return membership ? membership.role : null;
 }
 
 export async function createProject(userId: string, input: CreateProjectRequest): Promise<CreateProjectResponse> {
