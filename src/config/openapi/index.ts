@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license information.
 
 import './auth';
+import './project';
 import { registry } from './registry';
 
 registry.registerComponent('securitySchemes', 'bearerAuth', {
