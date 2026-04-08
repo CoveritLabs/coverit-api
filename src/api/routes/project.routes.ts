@@ -8,7 +8,13 @@ import * as projectController from "@api/controllers/project.controller";
 import { requireAuth } from "@api/middlewares/requireAuth";
 import { requireProjectAdmin, requireProjectMembership } from "@api/middlewares/requireProjectAccess";
 import { validateBody } from "@api/middlewares/validate";
-import { CreateProjectRequestSchema, UpdateProjectRequestSchema, AddMembersRequestSchema, RemoveMembersRequestSchema } from "@models/project";
+import {
+  CreateProjectRequestSchema,
+  UpdateProjectRequestSchema,
+  AddMembersRequestSchema,
+  RemoveMembersRequestSchema,
+  UpdateMemberRequestSchema,
+} from "@models/project";
 import targetAppRoutes from "@api/routes/targetApplication.routes";
 
 const router = Router();
@@ -23,6 +29,7 @@ router.get("/:projectId", requireProjectMembership, projectController.getProject
 
 // Member management
 router.post("/:projectId/members", requireProjectAdmin, validateBody(AddMembersRequestSchema), projectController.addProjectMembers);
+router.put("/:projectId/members", requireProjectAdmin, validateBody(UpdateMemberRequestSchema), projectController.updateProjectMember);
 router.delete("/:projectId/members", requireProjectAdmin, validateBody(RemoveMembersRequestSchema), projectController.removeProjectMembers);
 
 // Target applications and related entities

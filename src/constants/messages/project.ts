@@ -35,6 +35,10 @@ export const PROJECT_MESSAGES = {
   REMOVE_MEMBERS_SUCCESS: "Members removed successfully",
   REMOVE_MEMBERS_FAILURE: "Failed to remove members",
   REMOVE_MEMBERS_INVALID_USER: "One or more user emails are invalid",
+
+  // update member role
+  MEMBER_NOT_FOUND: "Project member not found",
+  UPDATE_MEMBER_SUCCESS: "Member updated successfully",
 } as const;
 
 /**
@@ -46,4 +50,5 @@ export const PROJECT_VALIDATION = {
   DESCRIPTION_MAX_LENGTH: "Project description must be at most 200 characters",
   MEMBERS_INVALID_USER: "Each user email must be a valid email address",
   MEMBERS_MIN_ITEMS: "At least one email is required",
+  MEMBER_ID_REQUIRED: "Member id is required",
 } as const;

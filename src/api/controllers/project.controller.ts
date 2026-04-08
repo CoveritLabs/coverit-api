@@ -72,6 +72,17 @@ export async function addProjectMembers(req: Request, res: Response, next: NextF
   }
 }
 
+export async function updateProjectMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { projectId } = req.params;
+
+    const response = await projectService.updateMember(projectId, req.body);
+    res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function removeProjectMembers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { projectId } = req.params;

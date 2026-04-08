@@ -15,7 +15,12 @@ const MessageResponseSchema = z.object({ message: z.string() });
 const ErrorResponseSchema = z.object({ message: z.string() });
 
 const VersionSchema = z.object({ id: z.string(), version: z.string() });
-const TargetApplicationResponseSchema = z.object({ id: z.string(), name: z.string(), baseUrl: z.string().optional(), versions: z.array(VersionSchema) });
+const TargetApplicationResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  baseUrl: z.string().optional(),
+  versions: z.array(VersionSchema),
+});
 const RegressionCodebaseResponseSchema = z.object({ id: z.string(), frameworkName: z.string(), repositoryUrl: z.string() });
 
 registry.register("TargetApplicationResponse", TargetApplicationResponseSchema);

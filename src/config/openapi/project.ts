@@ -4,7 +4,13 @@
 
 import { z } from "@utils/zod";
 import { registry } from "./registry";
-import { CreateProjectRequestSchema, UpdateProjectRequestSchema, AddMembersRequestSchema, RemoveMembersRequestSchema } from "@models/project";
+import {
+  CreateProjectRequestSchema,
+  UpdateProjectRequestSchema,
+  AddMembersRequestSchema,
+  RemoveMembersRequestSchema,
+  UpdateMemberRequestSchema,
+} from "@models/project";
 
 const MessageResponseSchema = z.object({ message: z.string() });
 const ErrorResponseSchema = z.object({ message: z.string() });
@@ -94,6 +100,22 @@ registry.registerPath({
   request: { body: { content: { "application/json": { schema: AddMembersRequestSchema } } } },
   responses: {
     200: { description: "Members added", content: { "application/json": { schema: MessageResponseSchema } } },
+    400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "put",
+  path: "/projects/{projectId}/members",
+  tags: ["Project"],
+  summary: "Update project member role",
+  security: [{ bearerAuth: [] }],
+  parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string" } }],
+  request: { body: { content: { "application/json": { schema: UpdateMemberRequestSchema } } } },
+  responses: {
+    200: { description: "Member updated", content: { "application/json": { schema: MessageResponseSchema } } },
     400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
     403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },

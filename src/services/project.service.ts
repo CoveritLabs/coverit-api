@@ -12,6 +12,7 @@ import type {
   UpdateProjectRequest,
   AddMembersRequest,
   RemoveMembersRequest,
+  UpdateMemberRequest,
   CreateProjectResponse,
   ProjectResponse,
 } from "@models/project";
@@ -172,16 +173,31 @@ export async function getProject(projectId: string): Promise<ProjectResponse> {
 export async function addMembers(projectId: string, input: AddMembersRequest): Promise<MessageResponse> {
   await assertProjectExists(projectId);
 
-  const userIds = await resolveUserIdsByEmails(input.emails);
+  const emails = input.members.map((m) => m.email);
+
+  const users = await userService.getUsersByEmails(emails).then((users: UserInfo[]) => {
+    const foundEmails = users.map((u) => u.email);
+    const notFoundEmails = emails.filter((email) => !foundEmails.includes(email));
+
+    if (notFoundEmails.length > 0) {
+      throw new BadRequestError(resolveMissingEmailsMessage(notFoundEmails));
+    }
+
+    return users;
+  });
+
+  const emailToUserId = new Map<string, string>();
+  users.forEach((u) => emailToUserId.set(u.email, u.id));
+
+  const userIds = users.map((u) => u.id);
 
   const existingMembers = await prisma.projectMember
-    .findMany({
-      where: { projectId, userId: { in: userIds } },
-      select: { userId: true },
-    })
+    .findMany({ where: { projectId, userId: { in: userIds } }, select: { userId: true } })
     .then((members) => members.map((m) => m.userId));
 
-  const newMembers = userIds.filter((id) => !existingMembers.includes(id)).map((userId) => ({ projectId, userId, role: ProjectRole.MEMBER }));
+  const newMembers = input.members
+    .filter((m) => !existingMembers.includes(emailToUserId.get(m.email)!))
+    .map((m) => ({ projectId, userId: emailToUserId.get(m.email)!, role: (m.role as ProjectRole) ?? ProjectRole.VIEWER }));
 
   if (newMembers.length > 0) {
     await prisma.projectMember.createMany({ data: newMembers });
@@ -193,6 +209,24 @@ export async function addMembers(projectId: string, input: AddMembersRequest): P
   ]);
 
   return { message: PROJECT_MESSAGES.ADD_MEMBERS_SUCCESS };
+}
+
+export async function updateMember(projectId: string, input: UpdateMemberRequest): Promise<MessageResponse> {
+  await assertProjectExists(projectId);
+
+  const membership = await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId, userId: input.id } } });
+  if (!membership) {
+    throw new NotFoundError(PROJECT_MESSAGES.MEMBER_NOT_FOUND);
+  }
+
+  await prisma.projectMember.update({ where: { projectId_userId: { projectId, userId: input.id } }, data: { role: input.role as ProjectRole } });
+
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS),
+  ]);
+
+  return { message: PROJECT_MESSAGES.UPDATE_MEMBER_SUCCESS };
 }
 
 export async function removeMembers(projectId: string, input: RemoveMembersRequest): Promise<MessageResponse> {
