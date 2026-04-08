@@ -22,23 +22,5 @@ redis.on("error", (err) => {
   console.error("Redis connection error:", err.message);
 });
 
-export const refreshKey = (userId: string, token: string): string => `refresh:${userId}:${token}`;
-
-export const refreshPattern = (userId: string): string => `refresh:${userId}:*`;
-
-export const resetKey = (hashedToken: string): string => `reset:${hashedToken}`;
-
-/** SCAN-based key search using cursor iteration. */
-export async function scanKeys(pattern: string): Promise<string[]> {
-  const keys: string[] = [];
-  let cursor = "0";
-  do {
-    const [nextCursor, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
-    cursor = nextCursor;
-    keys.push(...batch);
-  } while (cursor !== "0");
-  return keys;
-}
-
 export default redis;
 export { workerRedis };

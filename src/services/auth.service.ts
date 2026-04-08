@@ -8,10 +8,11 @@ import crypto from "crypto";
 import { env } from "@config/env";
 import { buildRedirectUrl } from "@utils/redirect";
 import prisma from "@lib/prisma";
-import redis, { refreshKey, refreshPattern, resetKey, scanKeys } from "@lib/redis";
+import { cacheDel, cacheGetString, cacheKeys, cacheScan, cacheSetString } from "@lib/cache";
 import { emailQueue } from "@queues/email.queue";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@utils/errors";
 import { generateAccessToken, generateRefreshToken, hashToken } from "@utils/token";
+import { CACHE_LOG_CONTEXTS } from "@constants/logEvents";
 import { AUTH_MESSAGES } from "@constants/messages";
 import type { ForgotPasswordRequest, LoginRequest, LoginResponse, RefreshResponse, ResetPasswordRequest, SignupRequest } from "@models/auth";
 import type { MessageResponse } from "@models/common";
@@ -52,7 +53,12 @@ export async function login(input: LoginRequest): Promise<LoginResponse> {
   const rawRefreshToken = generateRefreshToken();
   const hashedRefresh = hashToken(rawRefreshToken);
 
-  await redis.set(refreshKey(user.id, hashedRefresh), "1", "EX", env.JWT_REFRESH_EXPIRY_SECONDS);
+  await cacheSetString(
+    cacheKeys.auth.refresh(user.id, hashedRefresh),
+    "1",
+    env.JWT_REFRESH_EXPIRY_SECONDS,
+    CACHE_LOG_CONTEXTS.AUTH_WRITE_REFRESH_TOKEN,
+  );
 
   return {
     tokens: { accessToken, refreshToken: rawRefreshToken },
@@ -62,7 +68,7 @@ export async function login(input: LoginRequest): Promise<LoginResponse> {
 
 export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
   const oldHash = hashToken(oldRawToken);
-  const matchedKeys = await scanKeys(`refresh:*:${oldHash}`);
+  const matchedKeys = await cacheScan(cacheKeys.auth.refreshByHashPattern(oldHash), CACHE_LOG_CONTEXTS.AUTH_SCAN_REFRESH_TOKEN);
   if (matchedKeys.length === 0) {
     throw new UnauthorizedError(AUTH_MESSAGES.REFRESH_TOKEN_INVALID);
   }
@@ -70,13 +76,13 @@ export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
   const key = matchedKeys[0];
   const userId = key.split(":")[1];
 
-  await redis.del(key);
+  await cacheDel([key], CACHE_LOG_CONTEXTS.AUTH_DELETE_ROTATED_REFRESH_TOKEN);
 
   const accessToken = generateAccessToken(userId);
   const newRawRefresh = generateRefreshToken();
   const newHash = hashToken(newRawRefresh);
 
-  await redis.set(refreshKey(userId, newHash), "1", "EX", env.JWT_REFRESH_EXPIRY_SECONDS);
+  await cacheSetString(cacheKeys.auth.refresh(userId, newHash), "1", env.JWT_REFRESH_EXPIRY_SECONDS, CACHE_LOG_CONTEXTS.AUTH_WRITE_NEW_REFRESH_TOKEN);
 
   return {
     message: AUTH_MESSAGES.REFRESH_SUCCESS,
@@ -86,9 +92,9 @@ export async function refresh(oldRawToken: string): Promise<RefreshResponse> {
 
 export async function logout(rawRefreshToken: string): Promise<MessageResponse> {
   const hash = hashToken(rawRefreshToken);
-  const matchedKeys = await scanKeys(`refresh:*:${hash}`);
+  const matchedKeys = await cacheScan(cacheKeys.auth.refreshByHashPattern(hash), CACHE_LOG_CONTEXTS.AUTH_SCAN_REFRESH_TOKEN);
   if (matchedKeys.length > 0) {
-    await redis.del(matchedKeys[0]);
+    await cacheDel([matchedKeys[0]], CACHE_LOG_CONTEXTS.AUTH_DELETE_REFRESH_TOKEN);
   }
 
   return { message: AUTH_MESSAGES.LOGOUT_SUCCESS };
@@ -101,7 +107,7 @@ export async function forgotPassword(input: ForgotPasswordRequest): Promise<void
   const rawToken = crypto.randomBytes(32).toString("hex");
   const hashedToken = hashToken(rawToken);
 
-  await redis.set(resetKey(hashedToken), user.id, "EX", env.RESET_TOKEN_TTL_SECONDS);
+  await cacheSetString(cacheKeys.auth.reset(hashedToken), user.id, env.RESET_TOKEN_TTL_SECONDS, CACHE_LOG_CONTEXTS.AUTH_WRITE_RESET_TOKEN);
 
   const resetUrl = buildRedirectUrl(env.FRONTEND_URL, "/reset-password", { token: rawToken });
 
@@ -116,7 +122,7 @@ export async function forgotPassword(input: ForgotPasswordRequest): Promise<void
 
 export async function resetPassword(input: ResetPasswordRequest): Promise<MessageResponse> {
   const hashedToken = hashToken(input.token);
-  const userId = await redis.get(resetKey(hashedToken));
+  const userId = await cacheGetString(cacheKeys.auth.reset(hashedToken), CACHE_LOG_CONTEXTS.AUTH_READ_RESET_TOKEN);
 
   if (!userId) {
     throw new BadRequestError(AUTH_MESSAGES.RESET_TOKEN_INVALID);
@@ -129,12 +135,10 @@ export async function resetPassword(input: ResetPasswordRequest): Promise<Messag
     data: { password: hashedPassword },
   });
 
-  await redis.del(resetKey(hashedToken));
+  await cacheDel([cacheKeys.auth.reset(hashedToken)], CACHE_LOG_CONTEXTS.AUTH_DELETE_RESET_TOKEN);
 
-  const refreshKeys = await scanKeys(refreshPattern(userId));
-  if (refreshKeys.length > 0) {
-    await redis.del(...refreshKeys);
-  }
+  const refreshKeys = await cacheScan(cacheKeys.auth.refreshPattern(userId), CACHE_LOG_CONTEXTS.AUTH_SCAN_USER_REFRESH_TOKENS);
+  await cacheDel(refreshKeys, CACHE_LOG_CONTEXTS.AUTH_DELETE_USER_REFRESH_TOKENS);
 
   return { message: AUTH_MESSAGES.RESET_PASSWORD_SUCCESS };
 }
@@ -184,7 +188,12 @@ export async function oauthLogin(
   const rawRefreshToken = generateRefreshToken();
   const hashedRefresh = hashToken(rawRefreshToken);
 
-  await redis.set(refreshKey(user.id, hashedRefresh), "1", "EX", env.JWT_REFRESH_EXPIRY_SECONDS);
+  await cacheSetString(
+    cacheKeys.auth.refresh(user.id, hashedRefresh),
+    "1",
+    env.JWT_REFRESH_EXPIRY_SECONDS,
+    CACHE_LOG_CONTEXTS.AUTH_WRITE_OAUTH_REFRESH_TOKEN,
+  );
 
   return {
     tokens: { accessToken, refreshToken: rawRefreshToken },

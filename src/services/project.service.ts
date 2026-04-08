@@ -3,8 +3,9 @@
 // See LICENSE file in the project root for full license information.
 
 import prisma from "@lib/prisma";
+import { CACHE_LOG_CONTEXTS } from "@constants/logEvents";
 import { ProjectRole } from "@models/project";
-import redis, { refreshKey, refreshPattern, resetKey, scanKeys } from "@lib/redis";
+import { cacheDelByPattern, cacheGetJSON, cacheKeys, cacheSetJSON } from "@lib/cache";
 import { PROJECT_MESSAGES } from "@constants/messages";
 import type {
   CreateProjectRequest,
@@ -69,6 +70,8 @@ export async function createProject(userId: string, input: CreateProjectRequest)
     include: { members: true },
   });
 
+  await cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS);
+
   return { id: project.id };
 }
 
@@ -94,6 +97,11 @@ export async function updateProject(projectId: string, input: UpdateProjectReque
 
   await prisma.project.update({ where: { id: projectId }, data });
 
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS),
+  ]);
+
   return { message: PROJECT_MESSAGES.UPDATE_SUCCESS };
 }
 
@@ -102,24 +110,45 @@ export async function deleteProject(projectId: string): Promise<MessageResponse>
 
   await prisma.project.delete({ where: { id: projectId } });
 
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS),
+  ]);
+
   return { message: PROJECT_MESSAGES.DELETE_SUCCESS };
 }
 
 export async function getProjects(userId: string): Promise<ProjectResponse[]> {
+  const cacheKey = cacheKeys.user.projects(userId);
+  const cached = await cacheGetJSON<ProjectResponse[]>(cacheKey, CACHE_LOG_CONTEXTS.PROJECT_READ_PROJECTS);
+  if (cached !== null) {
+    return cached;
+  }
+
   const projects = await prisma.project.findMany({
     where: { members: { some: { userId } } },
     include: { members: { select: { role: true, user: { select: { id: true, name: true, email: true } } } } },
   });
 
-  return projects.map((project) => ({
+  const result = projects.map((project) => ({
     id: project.id,
     name: project.name,
     description: project.description ?? "",
     members: project.members.map((m) => ({ role: m.role, user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email } : undefined })),
   }));
+
+  await cacheSetJSON(cacheKey, result, undefined, CACHE_LOG_CONTEXTS.PROJECT_WRITE_PROJECTS);
+
+  return result;
 }
 
 export async function getProject(projectId: string): Promise<ProjectResponse> {
+  const cacheKey = cacheKeys.project.byId(projectId);
+  const cached = await cacheGetJSON<ProjectResponse>(cacheKey, CACHE_LOG_CONTEXTS.PROJECT_READ_PROJECT);
+  if (cached !== null) {
+    return cached;
+  }
+
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { members: { select: { role: true, user: { select: { id: true, name: true, email: true } } } } },
@@ -128,12 +157,16 @@ export async function getProject(projectId: string): Promise<ProjectResponse> {
     throw new NotFoundError(PROJECT_MESSAGES.NOT_FOUND);
   }
 
-  return {
+  const result: ProjectResponse = {
     id: project.id,
     name: project.name,
     description: project.description ?? "",
     members: project.members.map((m) => ({ role: m.role, user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email } : undefined })),
   };
+
+  await cacheSetJSON(cacheKey, result, undefined, CACHE_LOG_CONTEXTS.PROJECT_WRITE_PROJECT);
+
+  return result;
 }
 
 export async function addMembers(projectId: string, input: AddMembersRequest): Promise<MessageResponse> {
@@ -154,6 +187,11 @@ export async function addMembers(projectId: string, input: AddMembersRequest): P
     await prisma.projectMember.createMany({ data: newMembers });
   }
 
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT_ADD_MEMBERS),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS_ADD_MEMBERS),
+  ]);
+
   return { message: PROJECT_MESSAGES.ADD_MEMBERS_SUCCESS };
 }
 
@@ -163,6 +201,11 @@ export async function removeMembers(projectId: string, input: RemoveMembersReque
   const userIds = await resolveUserIdsByEmails(input.emails);
 
   await prisma.projectMember.deleteMany({ where: { projectId, userId: { in: userIds } } });
+
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT_REMOVE_MEMBERS),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS_REMOVE_MEMBERS),
+  ]);
 
   return { message: PROJECT_MESSAGES.REMOVE_MEMBERS_SUCCESS };
 }
