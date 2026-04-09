@@ -84,7 +84,7 @@ export async function updateProject(projectId: string, input: UpdateProjectReque
   };
 
   if (Object.prototype.hasOwnProperty.call(input, "description")) {
-    data.description = (input as any).description;
+    data.description = (input as UpdateProjectRequest).description ?? null;
   } else {
     data.description = project.description;
   }

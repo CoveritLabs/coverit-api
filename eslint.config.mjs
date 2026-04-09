@@ -21,4 +21,14 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['info', 'warn', 'error'] }],
     },
   },
+  {
+    files: ['src/**/__tests__/**', 'src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+        '@typescript-eslint/no-unsafe-function-type': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
 );

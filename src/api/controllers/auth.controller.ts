@@ -96,7 +96,7 @@ export async function oauthRedirect(req: Request, res: Response, next: NextFunct
   }
 }
 
-export async function oauthCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function oauthCallback(req: Request, res: Response, _next: NextFunction): Promise<void> {
   try {
     const provider = req.params.provider as OAuthProvider;
     if (!VALID_PROVIDERS.has(provider)) {
