@@ -34,9 +34,9 @@ import * as authService from "@services/auth.service";
 import { verifyAccessToken } from "@utils/token";
 import { emailQueue } from "@queues/email.queue";
 
-const mockPrisma = prisma as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-const mockRedis = redis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-const mockEmailQueue = emailQueue as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+const mockPrisma = prisma as any;  
+const mockRedis = redis as any;  
+const mockEmailQueue = emailQueue as any;  
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");

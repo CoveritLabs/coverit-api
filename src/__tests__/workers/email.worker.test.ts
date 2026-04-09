@@ -24,7 +24,7 @@ jest.mock("@services/email.service");
 jest.mock("@services/logger.service", () => ({ logger: { info: jest.fn() } }));
 jest.mock("@lib/redis", () => ({ workerRedis: {} }));
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import "@workers/email.worker";
 
 describe("workers/email.worker", () => {
