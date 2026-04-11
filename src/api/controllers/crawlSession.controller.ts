@@ -39,9 +39,9 @@ function handleControllerError(res: Response, error: unknown): void {
 
 export const getSessions = async (req: Request, res: Response) => {
     try {
-        const { app_version_id } = AppVersionParamsSchema.parse(req.params);
+        const { versionId } = AppVersionParamsSchema.parse(req.params);
         const query = GetSessionsQuerySchema.parse(req.query);
-        const result = await crawlService.getSessions(app_version_id, query);
+        const result = await crawlService.getSessions(versionId, query);
         res.json(result);
     } catch (e) {
         handleControllerError(res, e);
@@ -50,9 +50,9 @@ export const getSessions = async (req: Request, res: Response) => {
 
 export const createSession = async (req: Request, res: Response) => {
     try {
-        const { app_version_id } = AppVersionParamsSchema.parse(req.params);
+        const { versionId } = AppVersionParamsSchema.parse(req.params);
         const body = CreateCrawlSessionRequestSchema.parse(req.body);
-        const result = await crawlService.createSession(app_version_id, body.triggerType, body.crawlConfig);
+        const result = await crawlService.createSession(versionId, body.triggerType, body.crawlConfig);
         res.status(StatusCodes.CREATED).json(result);
     } catch (e) {
         handleControllerError(res, e);
@@ -61,8 +61,8 @@ export const createSession = async (req: Request, res: Response) => {
 
 export const getSessionDetails = async (req: Request, res: Response) => {
     try {
-        const { crawl_session_id } = CrawlSessionParamsSchema.parse(req.params);
-        const result = await crawlService.getSessionDetails(crawl_session_id);
+        const { crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
+        const result = await crawlService.getSessionDetails(crawlSessionId);
         res.json(result);
     } catch (e) {
         handleControllerError(res, e);
@@ -71,8 +71,8 @@ export const getSessionDetails = async (req: Request, res: Response) => {
 
 export const deleteSession = async (req: Request, res: Response) => {
     try {
-        const { crawl_session_id } = CrawlSessionParamsSchema.parse(req.params);
-        await crawlService.deleteSession(crawl_session_id);
+        const { crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
+        await crawlService.deleteSession(crawlSessionId);
         res.status(StatusCodes.OK).json({ message: 'Crawl session deleted successfully' });
     } catch (e) {
         handleControllerError(res, e);
@@ -81,8 +81,8 @@ export const deleteSession = async (req: Request, res: Response) => {
 
 export const startSession = async (req: Request, res: Response) => {
     try {
-        const { crawl_session_id } = CrawlSessionParamsSchema.parse(req.params);
-        await crawlService.startSession(crawl_session_id);
+        const { crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
+        await crawlService.startSession(crawlSessionId);
         res.status(StatusCodes.OK).json({ message: 'Crawl session started successfully' });
     } catch (e) {
         handleControllerError(res, e);
@@ -91,8 +91,8 @@ export const startSession = async (req: Request, res: Response) => {
 
 export const abortSession = async (req: Request, res: Response) => {
     try {
-        const { crawl_session_id } = CrawlSessionParamsSchema.parse(req.params);
-        await crawlService.abortSession(crawl_session_id);
+        const { crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
+        await crawlService.abortSession(crawlSessionId);
         res.status(StatusCodes.OK).json({ message: 'Crawl session aborted successfully' });
     } catch (e) {
         handleControllerError(res, e);
@@ -101,8 +101,8 @@ export const abortSession = async (req: Request, res: Response) => {
 
 export const pauseSession = async (req: Request, res: Response) => {
     try {
-        const { crawl_session_id } = CrawlSessionParamsSchema.parse(req.params);
-        await crawlService.pauseSession(crawl_session_id);
+        const { crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
+        await crawlService.pauseSession(crawlSessionId);
         res.status(StatusCodes.OK).json({ message: 'Crawl session paused successfully' });
     } catch (e) {
         handleControllerError(res, e);

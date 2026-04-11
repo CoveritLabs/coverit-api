@@ -8,6 +8,8 @@
         "dev": "nodemon",
         "build": "prisma generate && tsc && tsc-alias",
         "start": "node dist/index.js",
+        "worker:email": "ts-node -r tsconfig-paths/register src/workers/email.worker.ts",
+        "worker:crawler": "ts-node -r tsconfig-paths/register src/workers/crawler.worker.ts",
         "postinstall": "prisma generate",
         "db:migrate": "prisma migrate dev",
         "db:deploy": "prisma migrate deploy",

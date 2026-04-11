@@ -14,6 +14,7 @@ import {
   CreateTargetApplicationVersionRequestSchema,
 } from "@models/targetApplication";
 import { CreateRegressionCodebaseRequestSchema, UpdateRegressionCodebaseRequestSchema } from "@models/regressionCodebase";
+import crawlSessionRoutes from "@api/routes/crawlSession.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -27,6 +28,8 @@ router.get("/:appId", requireProjectMembership, targetController.getTargetApplic
 // Versions
 router.post("/:appId/versions", requireProjectMember, validateBody(CreateTargetApplicationVersionRequestSchema), targetController.createVersion);
 router.delete("/:appId/versions/:versionId", requireProjectAdmin, targetController.deleteVersion);
+
+router.use("/:appId/versions/:versionId/crawl-sessions", crawlSessionRoutes);
 
 // Regression codebases
 router.post(

@@ -10,7 +10,7 @@ export const crawlQueue = new Queue('crawl-tasks', {
 });
 
 export async function addCrawlJob(sessionId: string) {
-    await crawlQueue.add('start-crawl', { sessionId });
+    await crawlQueue.add('crawl', { sessionId });
 }
 
 export async function removeCrawlJob(sessionId: string) {

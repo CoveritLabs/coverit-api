@@ -1,139 +1,196 @@
-// Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
-// Proprietary and confidential. Unauthorized use is strictly prohibited.
-// See LICENSE file in the project root for full license information.
+import { workerRedis } from "@lib/redis";
+import { cacheDel, cacheKeys, cacheSetString } from "@lib/cache";
+import { logger } from "@services/logger.service";
+import {
+  getCrawlerJobPayload,
+  markQueuedSessionRunning,
+  isSessionAborted,
+  markSessionCompletedIfRunning,
+  markSessionFailedIfRunning,
+  markSessionFinishedAtIfAborted,
+} from "@services/crawlSession.service";
+import { Worker } from "bullmq";
+import { spawn } from "node:child_process";
+import path from "node:path";
 
-import { Worker } from 'bullmq';
-import { spawn } from 'child_process';
-import redis from '@lib/redis';
-import prisma from '@lib/prisma';
-import { CrawlStatus } from '@models/crawlSession';
+function resolveCrawlerWorkdir(): string {
+  const configured = process.env.CRAWLER_WORKDIR;
+  if (configured && configured.trim()) return configured;
+  return path.resolve(process.cwd(), "../coverit-crawler");
+}
 
-export const crawlWorker = new Worker('crawl-tasks', async (job) => {
-    const { sessionId } = job.data;
-    // only do it if its status is QUEUED, otherwise it means that the session was aborted while it was in the queue, and we should not start it.
-    const session = await prisma.crawlSession.findFirstOrThrow({
-        where: { id: sessionId }
-    });
-    if (session.status !== CrawlStatus[CrawlStatus.QUEUED]) {
-        throw new Error(`Cannot start session with status ${session.status}`);
-    }
+function resolvePythonCommand(): string {
+  return process.env.CRAWLER_PYTHON?.trim() || "python";
+}
 
-    await prisma.crawlSession.update({
-        where: { id: sessionId },
-        data: {
-            status: CrawlStatus[CrawlStatus.RUNNING],
-            startedAt: new Date(),
-        },
-    });
+function resolveCrawlerModule(): string {
+  return process.env.CRAWLER_MODULE?.trim() || "src.workers.crawler_worker";
+}
 
-    const pythonBinary = process.env.CRAWLER_PYTHON_BIN ?? 'python3';
+async function runCrawler(sessionId: string): Promise<void> {
+  const payload = await getCrawlerJobPayload(sessionId);
+  const python = resolvePythonCommand();
+  const cwd = resolveCrawlerWorkdir();
+  const moduleName = resolveCrawlerModule();
 
-    const pythonProcess = spawn(pythonBinary, ['main.py', '--session', sessionId], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: 'src/workers',
-        detached: false,
-    });
+  const args: string[] = ["-m", moduleName, "--payload-stdin"];
 
-    const pid = pythonProcess.pid;
-    if (pid === undefined) {
-        throw new Error(`Failed to start crawler process for session ${sessionId}`);
-    }
-    await redis.set(`session:${sessionId}:pid`, String(pid), 'EX', 86400);
+  await new Promise<void>(async (resolve, reject) => {
+    await markQueuedSessionRunning(sessionId);
 
-    const cleanup = async () => {
-        await redis.del(`session:${sessionId}:pid`);
+    const finalizeAbortedIfNeeded = async (): Promise<void> => {
+      try {
+        await markSessionFinishedAtIfAborted(sessionId);
+      } catch (e) {
+        logger.error(e);
+      }
     };
 
-    pythonProcess.once('close', () => {
-        void cleanup();
-    });
-
-    pythonProcess.stdout.on('data', (data) => {
-        console.log(`[Session ${sessionId}] Python: ${data}`);
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-        console.error(`[Session ${sessionId}] Error: ${data}`);
-    });
-
-    let deleted = false;
-
-    const exitCode = await new Promise<number | null>((resolve) => {
-        let lastStatus = CrawlStatus[CrawlStatus.RUNNING];
-        let checking = false;
-
-        const checkInterval = setInterval(async () => {
-            if (checking) {
-                return;
-            }
-
-            checking = true;
-            let current;
-            try {
-                current = await prisma.crawlSession.findFirstOrThrow({
-                    where: { id: sessionId },
-                    select: { status: true }
-                });
-            } catch (e) {
-                // this means that the session was deleted while the crawl was running. In this case, we should stop the crawl immediately.
-                pythonProcess.stdin.write('ABORT\n');
-                clearInterval(checkInterval);
-                setTimeout(() => pythonProcess.kill('SIGKILL'), 2000);
-                deleted = true;
-                return;
-            }
-
-            checking = false;
-
-            if (!current) return;
-            if (current.status === CrawlStatus[CrawlStatus.ABORTED]) {
-                pythonProcess.stdin.write('ABORT\n');
-                clearInterval(checkInterval);
-                setTimeout(() => pythonProcess.kill('SIGKILL'), 2000);
-                return;
-            }
-
-            if (current.status !== lastStatus) {
-                if (current.status === CrawlStatus[CrawlStatus.PAUSED]) {
-                    pythonProcess.stdin.write('PAUSE\n');
-                } else if (current.status === CrawlStatus[CrawlStatus.RUNNING]) {
-                    pythonProcess.stdin.write('RESUME\n');
-                }
-                lastStatus = current.status;
-            }
-        }, 3000);
-
-        pythonProcess.on('close', (code) => {
-            clearInterval(checkInterval);
-            resolve(code);
-        });
-
-        pythonProcess.on('error', (err) => {
-            console.error("Failed to start child process:", err);
-            clearInterval(checkInterval);
-            resolve(1);
-        });
-    });
-
-    if (!deleted) {
-        const finalSession = await prisma.crawlSession.findUnique({ where: { id: sessionId } });
-        const isAborted = finalSession?.status === CrawlStatus[CrawlStatus.ABORTED];
-        const isStopped = finalSession?.status === CrawlStatus[CrawlStatus.PAUSED];
-
-        if (exitCode === 0) {
-            if (!isAborted && !isStopped) {
-                await prisma.crawlSession.update({
-                    where: { id: sessionId },
-                    data: { status: CrawlStatus[CrawlStatus.COMPLETED], finishedAt: new Date() }
-                });
-            }
-        } else {
-            if (!isAborted) {
-                await prisma.crawlSession.update({
-                    where: { id: sessionId },
-                    data: { status: CrawlStatus[CrawlStatus.FAILED], finishedAt: new Date() }
-                });
-            }
-        }
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(python, args, {
+        cwd,
+        env: process.env,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      try {
+        const updated = await markSessionFailedIfRunning(sessionId, `Failed to spawn crawler process. ${message}`);
+        if (!updated) await finalizeAbortedIfNeeded();
+      } catch (inner) {
+        logger.error(inner);
+      }
+      return reject(err);
     }
-}, { connection: redis });
+
+    const { stdin, stdout, stderr: childStderr } = child;
+    if (!stdin || !stdout || !childStderr) {
+      const message = "Crawler process started without stdio pipes.";
+      try {
+        const updated = await markSessionFailedIfRunning(sessionId, message);
+        if (!updated) await finalizeAbortedIfNeeded();
+      } catch (e) {
+        logger.error(e);
+      }
+      return reject(new Error(message));
+    }
+
+    const pid = child.pid;
+    if (pid === undefined) {
+      const message = `Failed to start crawler process for session ${sessionId}`;
+      try {
+        const updated = await markSessionFailedIfRunning(sessionId, message);
+        if (!updated) await finalizeAbortedIfNeeded();
+      } catch (e) {
+        logger.error(e);
+      }
+      return reject(new Error(message));
+    }
+
+    const pidKey = cacheKeys.crawlSession.pid(sessionId);
+    await cacheSetString(pidKey, String(pid), 86400);
+
+    const cleanup = async (): Promise<void> => {
+      await cacheDel([pidKey]);
+    };
+
+    child.once("exit", () => {
+      void cleanup();
+    });
+
+    child.once("error", () => {
+      void cleanup();
+    });
+
+    const abortInterval = setInterval(() => {
+      void (async () => {
+        try {
+          const aborted = await isSessionAborted(sessionId);
+          if (!aborted) return;
+
+          try {
+            child.kill("SIGTERM");
+          } catch {
+          }
+          setTimeout(() => {
+            try {
+              child.kill("SIGKILL");
+            } catch {
+            }
+          }, 2000);
+        } catch (e) {
+          logger.error(e);
+        }
+      })();
+    }, 1000);
+
+    stdin.setDefaultEncoding("utf8");
+    stdin.end(JSON.stringify(payload));
+
+    let stderr = "";
+
+    stdout.setEncoding("utf8");
+    childStderr.setEncoding("utf8");
+
+    stdout.on("data", (chunk: string) => {
+      const lines = chunk.split(/\r?\n/).filter(Boolean);
+      for (const line of lines) logger.info(line);
+    });
+
+    childStderr.on("data", (chunk: string) => {
+      stderr += chunk;
+      if (stderr.length > 64_000) stderr = stderr.slice(stderr.length - 64_000);
+      const lines = chunk.split(/\r?\n/).filter(Boolean);
+      for (const line of lines) logger.error(line);
+    });
+
+    child.on("error", (err) => {
+      clearInterval(abortInterval);
+      void (async () => {
+        try {
+          const updated = await markSessionFailedIfRunning(sessionId, `Crawler process error. ${err.message}`);
+          if (!updated) await finalizeAbortedIfNeeded();
+        } catch (inner) {
+          logger.error(inner);
+        }
+      })();
+      reject(err);
+    });
+
+    child.on("exit", (code) => {
+      clearInterval(abortInterval);
+      void (async () => {
+        if (code === 0) {
+          try {
+            const updated = await markSessionCompletedIfRunning(sessionId);
+            if (!updated) await finalizeAbortedIfNeeded();
+          } catch (err) {
+            logger.error(err);
+          }
+          return resolve();
+        }
+
+        const message = `Crawler process exited with code ${code}. ${stderr.trim()}`.trim();
+        try {
+          const updated = await markSessionFailedIfRunning(sessionId, message);
+          if (!updated) await finalizeAbortedIfNeeded();
+        } catch (err) {
+          logger.error(err);
+        }
+        reject(new Error(message));
+      })();
+    });
+  });
+}
+
+new Worker(
+  "crawl-tasks",
+  async (job) => {
+    if (job.name !== "crawl") return;
+    await runCrawler(job.data.sessionId);
+  },
+  { connection: workerRedis },
+);
+
+logger.info("[Worker] Crawler worker started and listening for jobs...");
