@@ -1,6 +1,10 @@
+// Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+// Proprietary and confidential. Unauthorized use is strictly prohibited.
+// See LICENSE file in the project root for full license information.
+
 import { workerRedis } from "@lib/redis";
 import { logger } from "@services/logger.service";
-import type { CrawlJobPayload } from "@queues/crawler.queue";
+import type { CrawlJobPayload } from "types/crawler";
 import { Worker } from "bullmq";
 import { spawn } from "node:child_process";
 import path from "node:path";
