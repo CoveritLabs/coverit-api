@@ -2,6 +2,68 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
+jest.mock("@utils/token", () => ({ verifyAccessToken: jest.fn() }));
+
+import { requireAuth, getCurrentUserId } from "@api/middlewares/requireAuth";
+import { verifyAccessToken } from "@utils/token";
+import { AUTH_MESSAGES } from "@constants/messages";
+
+describe("requireAuth middleware", () => {
+  beforeEach(() => jest.resetAllMocks());
+
+  test("getCurrentUserId returns userId when set", () => {
+    const req: any = { userId: "u1" };
+    expect(getCurrentUserId(req)).toBe("u1");
+  });
+
+  test("getCurrentUserId throws when missing", () => {
+    const req: any = {};
+    expect(() => getCurrentUserId(req)).toThrow();
+  });
+
+  test("requireAuth - valid token sets req.userId and calls next", () => {
+    (verifyAccessToken as jest.Mock).mockReturnValue("u1");
+    const req: any = { headers: { authorization: "Bearer token" } };
+    const next = jest.fn();
+
+    requireAuth(req, {} as any, next);
+
+    expect(verifyAccessToken).toHaveBeenCalledWith("token");
+    expect(req.userId).toBe("u1");
+    expect(next).toHaveBeenCalled();
+  });
+
+  test("requireAuth - missing header calls next with UnauthorizedError", () => {
+    const req: any = { headers: {} };
+    const next = jest.fn();
+
+    requireAuth(req, {} as any, next);
+
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe(AUTH_MESSAGES.ACCESS_TOKEN_INVALID);
+  });
+
+  test("requireAuth - invalid token calls next with UnauthorizedError", () => {
+    (verifyAccessToken as jest.Mock).mockImplementation(() => {
+      throw new Error("bad");
+    });
+    const req: any = { headers: { authorization: "Bearer token" } };
+    const next = jest.fn();
+
+    requireAuth(req, {} as any, next);
+
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe(AUTH_MESSAGES.ACCESS_TOKEN_INVALID);
+  });
+});
+// For integration tests below, restore the real token verifier implementation
+// (will be moved to after env mock to ensure it uses the test secret)
+// Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+// Proprietary and confidential. Unauthorized use is strictly prohibited.
+// See LICENSE file in the project root for full license information.
+
 /**
  * @file Unit tests for requireAuth and errorHandler middlewares.
  */
@@ -27,10 +89,12 @@ jest.mock("@config/env", () => ({
   },
 }));
 
+// Keep a reference to the real token verifier for integration-style tests.
+const realToken = jest.requireActual("@utils/token");
+
 import app from "../../app";
 
 import { errorHandler } from "@api/middlewares/errorHandler";
-import { requireAuth } from "@api/middlewares/requireAuth";
 import { logger } from "@services/logger.service";
 import express from "express";
 
@@ -50,6 +114,10 @@ function createTestApp(): express.Application {
 const testApp = createTestApp();
 
 describe("requireAuth middleware", () => {
+  beforeEach(() => {
+    (verifyAccessToken as jest.Mock).mockImplementation((token: string) => realToken.verifyAccessToken(token));
+  });
+
   it("should attach userId and allow access with valid token", async () => {
     const token = jwt.sign({ sub: "uuid-1" }, "test-secret", { expiresIn: "15m" });
 

@@ -7,5 +7,5 @@
         "src/**/*.spec.ts"
     ],
     "legacyWatch": true,
-    "exec": "ts-node -r tsconfig-paths/register src/index.ts"
+    "exec": "ts-node --files -r tsconfig-paths/register src/index.ts"
 }
