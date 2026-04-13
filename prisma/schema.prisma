@@ -105,7 +105,7 @@ model TargetApplicationVersion {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
-
+  crawlSessions CrawlSession[]
   @@unique([targetApplicationId, version])
   @@map("target_application_versions")
 }
@@ -126,4 +126,21 @@ model RegressionCodebase {
   targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
   @@map("regression_codebases")
   @@unique([targetApplicationId, repositoryUrl])
+}
+
+model CrawlSession {
+  id              String    @id @default(uuid()) @map("crawl_session_id") @db.Uuid
+  appVersionId    String    @map("app_version_id") @db.Uuid
+  status          String    @default("NEW")
+  triggerType     String    @map("trigger_type")
+  config          Json      
+  stateCount      Int       @default(0) @map("state_count")
+  transitionCount Int       @default(0) @map("transition_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  error           String?   @db.Text
+  appVersion      TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
+
+  @@map("crawl_sessions")
 }

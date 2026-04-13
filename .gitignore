@@ -38,3 +38,4 @@ coverage
 .env.*
 
 /src/generated/prisma
+.npmrc
