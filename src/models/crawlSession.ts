@@ -32,8 +32,6 @@ export type GetSessionsQuery = ZodInfer<typeof GetSessionsQuerySchema>;
 export { CrawlTriggerType, CrawlStatus };
 
 
-
-
 export const CrawlConfigSchema = z.object({
     maxStates: z.number().int().min(1).max(100000),
     maxDepth: z.number().int().min(1).max(1000),
@@ -72,7 +70,7 @@ export const CrawlConfigSchema = z.object({
 }).loose() satisfies ZodType<CrawlConfig>;
 
 export const CreateCrawlSessionRequestSchema = z.object({
-    triggerType: z.nativeEnum(CrawlTriggerType),
+    triggerType: z.enum(CrawlTriggerType),
     crawlConfig: CrawlConfigSchema,
 }) satisfies ZodType<CreateCrawlSessionRequest>;
 
@@ -87,8 +85,8 @@ export const CrawlSessionParamsSchema = z.object({
 export const GetSessionsQuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
-    status: z.nativeEnum(CrawlStatus).optional(),
-    triggerType: z.nativeEnum(CrawlTriggerType).optional(),
+    status: z.enum(CrawlStatus).optional(),
+    triggerType: z.enum(CrawlTriggerType).optional(),
 });
 
 

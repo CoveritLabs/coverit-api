@@ -26,11 +26,13 @@ def command_listener():
 threading.Thread(target=command_listener, daemon=True).start()
 
 def run_crawler():
+    i = 0
     while state["running"]:
         if state["paused"]:
             time.sleep(1) # Wait and check again
             continue
         print(f"Crawling... {i+1}/30")
+        i += 1
         time.sleep(1)
 
 if __name__ == "__main__":

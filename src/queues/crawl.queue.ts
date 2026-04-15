@@ -5,7 +5,7 @@
 import { Queue } from 'bullmq';
 import redis from '@lib/redis';
 
-export const crawlQueue = new Queue('crawl-tasks', {
+export const crawlQueue = new Queue('crawler', {
     connection: redis
 });
 

@@ -3,10 +3,17 @@
 // See LICENSE file in the project root for full license information.
 
 import prisma from "@lib/prisma";
+import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
+import {
+    fromDbCrawlStatus,
+    fromDbCrawlTriggerType,
+    toDbCrawlStatusFilter,
+    toDbCrawlTriggerType,
+    toDbCrawlTriggerTypeFilter,
+} from "@mappers/crawlSession.mapper";
 import {
     type CrawlConfig,
     CrawlConfigSchema,
-    CrawlStatus,
     CrawlTriggerType,
     type ApplicationVersionCrawlSessionsResponse,
     type CrawlSessionData,
@@ -17,36 +24,15 @@ import { CrawlerJobPayload } from "types/crawler";
 import { toIso } from "@utils/date";
 
 
-
-
 type DbCrawlSession = Awaited<ReturnType<typeof prisma.crawlSession.findFirstOrThrow>>;
-
 type DbCrawlStatus = DbCrawlSession["status"];
 type DbCrawlTriggerType = DbCrawlSession["triggerType"];
-
-const toDbStatusFilter = (status?: CrawlStatus): DbCrawlStatus | undefined => {
-    if (status === undefined || status === CrawlStatus.UNSPECIFIED) return undefined;
-    return CrawlStatus[status] as unknown as DbCrawlStatus;
-};
-
-const toDbTriggerTypeFilter = (triggerType?: CrawlTriggerType): DbCrawlTriggerType | undefined => {
-    if (triggerType === undefined || triggerType === CrawlTriggerType.UNSPECIFIED) return undefined;
-    return CrawlTriggerType[triggerType] as unknown as DbCrawlTriggerType;
-};
-
-const fromDbStatus = (status: DbCrawlStatus): CrawlStatus => {
-    return (CrawlStatus[status as unknown as keyof typeof CrawlStatus] ?? CrawlStatus.UNSPECIFIED) as CrawlStatus;
-};
-
-const fromDbTriggerType = (triggerType: DbCrawlTriggerType): CrawlTriggerType => {
-    return (CrawlTriggerType[triggerType as unknown as keyof typeof CrawlTriggerType] ?? CrawlTriggerType.UNSPECIFIED) as CrawlTriggerType;
-};
 
 const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
     id: session.id,
     appVersionId: session.appVersionId,
-    status: fromDbStatus(session.status),
-    triggerType: fromDbTriggerType(session.triggerType),
+    status: fromDbCrawlStatus(session.status),
+    triggerType: fromDbCrawlTriggerType(session.triggerType),
     crawlConfig: (() => {
         const parsed = CrawlConfigSchema.safeParse(session.config);
         return parsed.success ? parsed.data : undefined;
@@ -64,8 +50,8 @@ export async function getSessions(
     query: GetSessionsQuery
 ): Promise<ApplicationVersionCrawlSessionsResponse> {
     const { page, pageSize, status, triggerType } = query;
-    const dbStatus = toDbStatusFilter(status);
-    const dbTriggerType = toDbTriggerTypeFilter(triggerType);
+    const dbStatus = toDbCrawlStatusFilter<DbCrawlStatus>(status);
+    const dbTriggerType = toDbCrawlTriggerTypeFilter<DbCrawlTriggerType>(triggerType);
     const [sessions, totalCount] = await Promise.all([
         prisma.crawlSession.findMany({
             where: {
@@ -115,7 +101,7 @@ export async function createSession(
     const newSession = await prisma.crawlSession.create({
         data: {
             appVersionId: versionId,
-            triggerType: CrawlTriggerType[triggerType] as unknown as DbCrawlTriggerType,
+            triggerType: toDbCrawlTriggerType(triggerType) as unknown as DbCrawlTriggerType,
             config: persistedConfig,
         }
     });
@@ -141,10 +127,10 @@ export async function startSession(sessionId: string): Promise<void> {
         where: { id: sessionId }
     });
 
-    if (session.status === CrawlStatus[CrawlStatus.NEW]) {
+    if (session.status === PrismaCrawlStatus.NEW) {
         await prisma.crawlSession.update({
             where: { id: sessionId },
-            data: { status: CrawlStatus[CrawlStatus.QUEUED] }
+            data: { status: PrismaCrawlStatus.QUEUED }
         });
 
         try {
@@ -152,7 +138,7 @@ export async function startSession(sessionId: string): Promise<void> {
         } catch (error) {
             await prisma.crawlSession.update({
                 where: { id: sessionId },
-                data: { status: CrawlStatus[CrawlStatus.NEW] }
+                data: { status: PrismaCrawlStatus.NEW }
             });
             throw error;
         }
@@ -160,10 +146,10 @@ export async function startSession(sessionId: string): Promise<void> {
         return;
     }
 
-    if (session.status === CrawlStatus[CrawlStatus.PAUSED]) {
+    if (session.status === PrismaCrawlStatus.PAUSED) {
         await prisma.crawlSession.update({
             where: { id: sessionId },
-            data: { status: CrawlStatus[CrawlStatus.RUNNING] }
+            data: { status: PrismaCrawlStatus.RUNNING }
         });
         return;
     }
@@ -176,18 +162,18 @@ export async function abortSession(sessionId: string): Promise<void> {
         where: { id: sessionId }
     });
 
-    if (session.status !== CrawlStatus[CrawlStatus.RUNNING] && session.status !== CrawlStatus[CrawlStatus.PAUSED]
-        && session.status !== CrawlStatus[CrawlStatus.QUEUED]) {
+    if (session.status !== PrismaCrawlStatus.RUNNING && session.status !== PrismaCrawlStatus.PAUSED
+        && session.status !== PrismaCrawlStatus.QUEUED) {
         throw new Error(`Cannot abort session with status ${session.status}`);
     }
 
-    if (session.status === CrawlStatus[CrawlStatus.QUEUED]) {
+    if (session.status === PrismaCrawlStatus.QUEUED) {
         await removeCrawlJob(sessionId);
     }
 
     await prisma.crawlSession.update({
         where: { id: sessionId },
-        data: { status: CrawlStatus[CrawlStatus.ABORTED] }
+        data: { status: PrismaCrawlStatus.ABORTED }
     });
 };
 
@@ -196,13 +182,13 @@ export async function pauseSession(sessionId: string): Promise<void> {
         where: { id: sessionId }
     });
 
-    if (session.status !== CrawlStatus[CrawlStatus.RUNNING]) {
+    if (session.status !== PrismaCrawlStatus.RUNNING) {
         throw new Error(`Cannot pause session with status ${session.status}`);
     }
 
     await prisma.crawlSession.update({
         where: { id: sessionId },
-        data: { status: CrawlStatus[CrawlStatus.PAUSED] }
+        data: { status: PrismaCrawlStatus.PAUSED }
     });
 };
 
@@ -210,10 +196,10 @@ export async function markQueuedSessionRunning(sessionId: string): Promise<void>
     const result = await prisma.crawlSession.updateMany({
         where: {
             id: sessionId,
-            status: CrawlStatus[CrawlStatus.QUEUED],
+            status: PrismaCrawlStatus.QUEUED,
         },
         data: {
-            status: CrawlStatus[CrawlStatus.RUNNING],
+            status: PrismaCrawlStatus.RUNNING,
             startedAt: new Date(),
         },
     });
@@ -230,7 +216,7 @@ export async function markSessionCompleted(sessionId: string): Promise<void> {
     await prisma.crawlSession.update({
         where: { id: sessionId },
         data: {
-            status: CrawlStatus[CrawlStatus.COMPLETED],
+            status: PrismaCrawlStatus.COMPLETED,
             finishedAt: new Date(),
             error: null,
         },
@@ -241,7 +227,7 @@ export async function markSessionFailed(sessionId: string, errorMessage: string)
     await prisma.crawlSession.update({
         where: { id: sessionId },
         data: {
-            status: CrawlStatus[CrawlStatus.FAILED],
+            status: PrismaCrawlStatus.FAILED,
             finishedAt: new Date(),
             error: errorMessage,
         },
@@ -253,17 +239,17 @@ export async function isSessionAborted(sessionId: string): Promise<boolean> {
         where: { id: sessionId },
         select: { status: true },
     });
-    return session?.status === CrawlStatus[CrawlStatus.ABORTED];
+    return session?.status === PrismaCrawlStatus.ABORTED;
 }
 
 export async function markSessionCompletedIfRunning(sessionId: string): Promise<boolean> {
     const result = await prisma.crawlSession.updateMany({
         where: {
             id: sessionId,
-            status: CrawlStatus[CrawlStatus.RUNNING],
+            status: PrismaCrawlStatus.RUNNING,
         },
         data: {
-            status: CrawlStatus[CrawlStatus.COMPLETED],
+            status: PrismaCrawlStatus.COMPLETED,
             finishedAt: new Date(),
             error: null,
         },
@@ -275,10 +261,10 @@ export async function markSessionFailedIfRunning(sessionId: string, errorMessage
     const result = await prisma.crawlSession.updateMany({
         where: {
             id: sessionId,
-            status: CrawlStatus[CrawlStatus.RUNNING],
+            status: PrismaCrawlStatus.RUNNING,
         },
         data: {
-            status: CrawlStatus[CrawlStatus.FAILED],
+            status: PrismaCrawlStatus.FAILED,
             finishedAt: new Date(),
             error: errorMessage,
         },
@@ -290,7 +276,7 @@ export async function markSessionFinishedAtIfAborted(sessionId: string): Promise
     await prisma.crawlSession.updateMany({
         where: {
             id: sessionId,
-            status: CrawlStatus[CrawlStatus.ABORTED],
+            status: PrismaCrawlStatus.ABORTED,
             finishedAt: null,
         },
         data: {

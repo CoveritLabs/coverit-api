@@ -189,7 +189,7 @@ async function runCrawler(sessionId: string): Promise<void> {
 }
 
 new Worker(
-  "crawl-tasks",
+  "crawler",
   async (job) => {
     if (job.name !== "crawl") return;
     await runCrawler(job.data.sessionId);
