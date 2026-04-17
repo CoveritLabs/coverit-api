@@ -1,3 +1,7 @@
+// Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+// Proprietary and confidential. Unauthorized use is strictly prohibited.
+// See LICENSE file in the project root for full license information.
+
 export type InputDefaultsConfig = {
     field_patterns: Record<string, string>;
     type_fallbacks: Record<string, string>;
@@ -21,11 +25,4 @@ export type CrawlerRunSettings = {
     click_non_http_links?: boolean;
     defer_destructive_actions?: boolean;
     destructive_keywords?: string;
-};
-
-export type CrawlerJobPayload = {
-    base_url: string;
-    session_id: string;
-    settings: CrawlerRunSettings;
-    input_defaults?: InputDefaultsConfig;
 };

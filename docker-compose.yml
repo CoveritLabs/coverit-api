@@ -43,10 +43,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-
   db:
     image: postgres:18
     container_name: coverit-postgres
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
