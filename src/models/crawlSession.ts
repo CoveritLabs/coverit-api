@@ -23,8 +23,12 @@ export type CrawlConfig = Plain<ContractCrawlConfig> & {
     crawlerSettings?: CrawlerRunSettings;
     inputDefaults?: InputDefaultsConfig;
 };
-export type CreateCrawlSessionRequest = Plain<ContractCreateCrawlSessionRequest>;
-export type CrawlSessionData = Plain<ContractCrawlSessionData>;
+export type CreateCrawlSessionRequest = Omit<Plain<ContractCreateCrawlSessionRequest>, "crawlConfig"> & {
+    crawlConfig: CrawlConfig;
+};
+export type CrawlSessionData = Omit<Plain<ContractCrawlSessionData>, "crawlConfig"> & {
+    crawlConfig: CrawlConfig;
+};
 export type ApplicationVersionCrawlSessionsResponse = Plain<ContractApplicationVersionCrawlSessionsResponse>;
 export type CrawlSessionByIDResponse = Plain<ContractCrawlSessionByIDResponse>;
 export type StopCrawlSessionResponse = Plain<ContractStopCrawlSessionResponse>;
@@ -32,46 +36,91 @@ export type GetSessionsQuery = ZodInfer<typeof GetSessionsQuerySchema>;
 export { CrawlTriggerType, CrawlStatus };
 
 
+function normalizeCrawlerSettings(input: unknown): unknown {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) return input;
+    const src = input as Record<string, unknown>;
+
+    const mapped: Record<string, unknown> = { ...src };
+    const remap = (from: string, to: string) => {
+        if (mapped[from] !== undefined && mapped[to] === undefined) {
+            mapped[to] = mapped[from];
+        }
+    };
+
+    remap('timeout_ms', 'timeoutMs');
+    remap('max_states', 'maxStates');
+    remap('max_transitions', 'maxTransitions');
+    remap('max_elements_per_state', 'maxElementsPerState');
+    remap('max_select_options_per_element', 'maxSelectOptionsPerElement');
+    remap('max_action_repeats_per_url', 'maxActionRepeatsPerUrl');
+    remap('action_retry_count', 'actionRetryCount');
+    remap('replay_retry_count', 'replayRetryCount');
+    remap('popup_timeout_ms', 'popupTimeoutMs');
+    remap('dom_quiet_ms', 'domQuietMs');
+    remap('dom_settle_timeout_ms', 'domSettleTimeoutMs');
+    remap('use_dom_quiescence', 'useDomQuiescence');
+    remap('page_load_state', 'pageLoadState');
+    remap('click_non_http_links', 'clickNonHttpLinks');
+    remap('defer_destructive_actions', 'deferDestructiveActions');
+    remap('destructive_keywords', 'destructiveKeywords');
+
+    return mapped;
+}
+
+function normalizeInputDefaults(input: unknown): unknown {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) return input;
+    const src = input as Record<string, unknown>;
+    const mapped: Record<string, unknown> = { ...src };
+
+    if (mapped.field_patterns !== undefined && mapped.fieldPatterns === undefined) {
+        mapped.fieldPatterns = mapped.field_patterns;
+    }
+    if (mapped.type_fallbacks !== undefined && mapped.typeFallbacks === undefined) {
+        mapped.typeFallbacks = mapped.type_fallbacks;
+    }
+    return mapped;
+}
+
+
 export const CrawlConfigSchema = z.object({
-    maxStates: z.number().int().min(1).max(100000),
-    maxDepth: z.number().int().min(1).max(1000),
-    includeUrlPatterns: z.array(z.string().min(1).max(2048)).max(100),
-    excludeUrlPatterns: z.array(z.string().min(1).max(2048)).max(100),
-    enableSemanticDecisions: z.boolean(),
-    headless: z.boolean(),
-    timeoutSeconds: z.number().int().min(1).max(86400),
     crawlerSettings: z
-        .object({
+        .preprocess(
+            normalizeCrawlerSettings,
+            z.object({
             headless: z.boolean().optional(),
-            timeout_ms: z.number().int().min(1).max(86400_000).optional(),
-            max_states: z.number().int().min(1).max(100000).optional(),
-            max_transitions: z.number().int().min(1).max(1_000_000).optional(),
-            max_elements_per_state: z.number().int().min(1).max(10000).optional(),
-            max_select_options_per_element: z.number().int().min(1).max(1000).optional(),
-            max_action_repeats_per_url: z.number().int().min(0).max(1000).optional(),
-            action_retry_count: z.number().int().min(0).max(100).optional(),
-            replay_retry_count: z.number().int().min(0).max(100).optional(),
-            popup_timeout_ms: z.number().int().min(1).max(86400_000).optional(),
-            dom_quiet_ms: z.number().int().min(0).max(600_000).optional(),
-            dom_settle_timeout_ms: z.number().int().min(1).max(86400_000).optional(),
-            use_dom_quiescence: z.boolean().optional(),
-            page_load_state: z.string().min(1).max(100).optional(),
-            click_non_http_links: z.boolean().optional(),
-            defer_destructive_actions: z.boolean().optional(),
-            destructive_keywords: z.string().min(0).max(5000).optional(),
+            timeoutMs: z.number().int().min(1).max(86400_000).optional(),
+            maxStates: z.number().int().min(1).max(100000).optional(),
+            maxTransitions: z.number().int().min(1).max(1_000_000).optional(),
+            maxElementsPerState: z.number().int().min(1).max(10000).optional(),
+            maxSelectOptionsPerElement: z.number().int().min(1).max(1000).optional(),
+            maxActionRepeatsPerUrl: z.number().int().min(0).max(1000).optional(),
+            actionRetryCount: z.number().int().min(0).max(100).optional(),
+            replayRetryCount: z.number().int().min(0).max(100).optional(),
+            popupTimeoutMs: z.number().int().min(1).max(86400_000).optional(),
+            domQuietMs: z.number().int().min(0).max(600_000).optional(),
+            domSettleTimeoutMs: z.number().int().min(1).max(86400_000).optional(),
+            useDomQuiescence: z.boolean().optional(),
+            pageLoadState: z.string().min(1).max(100).optional(),
+            clickNonHttpLinks: z.boolean().optional(),
+            deferDestructiveActions: z.boolean().optional(),
+            destructiveKeywords: z.string().min(0).max(5000).optional(),
         })
+        )
         .optional(),
     inputDefaults: z
-        .object({
-            field_patterns: z.record(z.string(), z.string()),
-            type_fallbacks: z.record(z.string(), z.string()),
+        .preprocess(
+            normalizeInputDefaults,
+            z.object({
+            fieldPatterns: z.record(z.string(), z.string()),
+            typeFallbacks: z.record(z.string(), z.string()),
         })
+        )
         .optional(),
 }).loose() satisfies ZodType<CrawlConfig>;
 
 export const CreateCrawlSessionRequestSchema = z.object({
     triggerType: z.enum(CrawlTriggerType),
-    crawlConfig: CrawlConfigSchema,
+    crawlConfig: CrawlConfigSchema.optional().default({}),
 }) satisfies ZodType<CreateCrawlSessionRequest>;
 
 export const AppVersionParamsSchema = z.object({

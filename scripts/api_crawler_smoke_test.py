@@ -12,34 +12,6 @@ import urllib.request
 import urllib.parse
 from typing import Any, Dict, Optional, Tuple
 
-
-def _env(name: str, default: str) -> str:
-    v = os.getenv(name)
-    return v if v is not None and v.strip() else default
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    v = raw.strip().lower()
-    if v in {"1", "true", "yes", "y", "on"}:
-        return True
-    if v in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return int(raw)
-    except Exception:
-        return default
-
-
 def _json_loads_maybe(text: str) -> Any:
     try:
         return json.loads(text)
@@ -158,28 +130,26 @@ def _parse_trigger_type(value: str) -> int:
 
 
 def main() -> int:
-    base = _env("COVERIT_API_BASE_URL", "http://localhost:3000/api/v1")
-    password = _env("COVERIT_TEST_PASSWORD", "TestPassword123!@#")
-    name = _env("COVERIT_TEST_NAME", "API Smoke Tester")
-    email = os.getenv("COVERIT_TEST_EMAIL")
-    if not email or not email.strip():
-        email = f"api-smoke-{uuid.uuid4().hex[:12]}@example.com"
+    base = "http://localhost:3000/api/v1"
+    password = "TestPassword123!@#"
+    name = "API Smoke Tester"
+    email = f"api-smoke-{uuid.uuid4().hex[:12]}@example.com"
 
-    project_name = _env("COVERIT_PROJECT_NAME", f"api-smoke-{uuid.uuid4().hex[:8]}")
-    project_description = os.getenv("COVERIT_PROJECT_DESCRIPTION")
+    project_name = f"api-smoke-{uuid.uuid4().hex[:8]}"
+    project_description = "A project created by the API crawler"
 
-    target_app_name = _env("COVERIT_TARGET_APP_NAME", f"target-app-{uuid.uuid4().hex[:8]}")
-    target_base_url = _env("COVERIT_TARGET_BASE_URL", "http://localhost:3000/health")
-    target_version = _env("COVERIT_TARGET_VERSION", "0.0.1")
+    target_app_name = f"target-app-{uuid.uuid4().hex[:8]}"
+    target_base_url = "https://the-internet.herokuapp.com"
+    target_version = "0.0.1"
 
-    poll_interval = float(_env("COVERIT_POLL_INTERVAL_SECONDS", "2"))
-    poll_timeout = int(_env("COVERIT_POLL_TIMEOUT_SECONDS", "600"))
+    poll_interval = 2.0
+    poll_timeout = 600
 
-    pickup_timeout = float(_env("COVERIT_WORKER_PICKUP_TIMEOUT_SECONDS", "30"))
-    precheck_api = _env_bool("COVERIT_PRECHECK_API_HEALTH", True)
-    precheck_target = _env_bool("COVERIT_PRECHECK_TARGET_URL", True)
-    min_states = _env_int("COVERIT_ASSERT_MIN_STATES", 0)
-    min_transitions = _env_int("COVERIT_ASSERT_MIN_TRANSITIONS", 0)
+    pickup_timeout = 30.0
+    precheck_api = True
+    precheck_target = True
+    min_states = 0
+    min_transitions = 0
 
     print(
         json.dumps(
@@ -262,23 +232,29 @@ def main() -> int:
     )
 
     crawl_config: Dict[str, Any] = {
-        "maxStates": int(_env("COVERIT_CRAWL_MAX_STATES", "50")),
-        "maxDepth": int(_env("COVERIT_CRAWL_MAX_DEPTH", "3")),
-        "includeUrlPatterns": [p for p in _env("COVERIT_CRAWL_INCLUDE_PATTERNS", ".*").split(",") if p.strip()],
-        "excludeUrlPatterns": [p for p in _env("COVERIT_CRAWL_EXCLUDE_PATTERNS", "").split(",") if p.strip()],
-        "enableSemanticDecisions": _env("COVERIT_CRAWL_ENABLE_SEMANTIC", "false").lower() == "true",
-        "headless": _env("COVERIT_CRAWL_HEADLESS", "true").lower() == "true",
-        "timeoutSeconds": int(_env("COVERIT_CRAWL_TIMEOUT_SECONDS", "60")),
         "crawlerSettings": {
-            "defer_destructive_actions": _env("COVERIT_CRAWL_DEFER_DESTRUCTIVE", "true").lower() == "true",
-            "destructive_keywords": _env(
-                "COVERIT_CRAWL_DESTRUCTIVE_KEYWORDS",
+            "headless": False,
+            "timeout_ms": 30000,
+            "max_states": 50,
+            "max_transitions": 200,
+            "max_elements_per_state": 5,
+            "max_select_options_per_element": 2,
+            "max_action_repeats_per_url": 1,
+            "action_retry_count": 1,
+            "replay_retry_count": 1,
+            "popup_timeout_ms": 3000,
+            "dom_quiet_ms": 400,
+            "dom_settle_timeout_ms": 3000,
+            "use_dom_quiescence": True,
+            "page_load_state": "networkidle",
+            "click_non_http_links": False,
+            "defer_destructive_actions": "true".lower() == "true",
+            "destructive_keywords":
                 "logout,log out,sign out,delete,remove,unsubscribe,cancel,checkout,pay,purchase,order,place order,reset,deactivate,terminate,drop,empty cart,clear cart",
-            ),
         },
     }
 
-    trigger_type = _parse_trigger_type(_env("COVERIT_CRAWL_TRIGGER_TYPE", "MANUAL"))
+    trigger_type = _parse_trigger_type("MANUAL")
 
     status, session = _http_json(
         "POST",
@@ -323,7 +299,6 @@ def main() -> int:
 
     pickup_deadline = min(deadline, time.time() + pickup_timeout)
     last = None
-    picked_up = False
     while time.time() < pickup_deadline:
         _, details = _http_json("GET", details_url, token=access_token)
         status_raw = (details or {}).get("status")
@@ -343,7 +318,6 @@ def main() -> int:
             last = snapshot
 
         if status_value in {"RUNNING", "COMPLETED", "FAILED", "ABORTED", "PAUSED"}:
-            picked_up = status_value != "QUEUED"
             break
 
         time.sleep(poll_interval)

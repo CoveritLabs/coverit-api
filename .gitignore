@@ -8,6 +8,7 @@ pnpm-debug.log*
 
 # Dependencies
 node_modules
+**/__pycache__/
 .pnp
 .pnp.js
 

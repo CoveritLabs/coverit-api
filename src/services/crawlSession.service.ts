@@ -10,6 +10,7 @@ import {
     toDbCrawlStatusFilter,
     toDbCrawlTriggerType,
     toDbCrawlTriggerTypeFilter,
+    toPersistedCrawlConfig,
 } from "@mappers/crawlSession.mapper";
 import {
     type CrawlConfig,
@@ -27,6 +28,7 @@ type DbCrawlSession = Awaited<ReturnType<typeof prisma.crawlSession.findFirstOrT
 type DbCrawlStatus = DbCrawlSession["status"];
 type DbCrawlTriggerType = DbCrawlSession["triggerType"];
 
+
 const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
     id: session.id,
     appVersionId: session.appVersionId,
@@ -34,7 +36,7 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
     triggerType: fromDbCrawlTriggerType(session.triggerType),
     crawlConfig: (() => {
         const parsed = CrawlConfigSchema.safeParse(session.config);
-        return parsed.success ? parsed.data : undefined;
+        return parsed.success ? parsed.data : {};
     })(),
     stateCount: session.stateCount,
     transitionCount: session.transitionCount,
@@ -85,17 +87,7 @@ export async function createSession(
     crawlConfig: CrawlConfig,
 ): Promise<CrawlSessionData> {
     const parsedConfig = CrawlConfigSchema.parse(crawlConfig);
-    const persistedConfig = {
-        maxStates: parsedConfig.maxStates,
-        maxDepth: parsedConfig.maxDepth,
-        includeUrlPatterns: parsedConfig.includeUrlPatterns,
-        excludeUrlPatterns: parsedConfig.excludeUrlPatterns,
-        enableSemanticDecisions: parsedConfig.enableSemanticDecisions,
-        headless: parsedConfig.headless,
-        timeoutSeconds: parsedConfig.timeoutSeconds,
-        crawlerSettings: parsedConfig.crawlerSettings,
-        inputDefaults: parsedConfig.inputDefaults,
-    };
+    const persistedConfig = toPersistedCrawlConfig(parsedConfig);
 
     const newSession = await prisma.crawlSession.create({
         data: {
