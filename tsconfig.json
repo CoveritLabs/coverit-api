@@ -17,6 +17,7 @@
             "@lib/*": ["lib/*"],
             "@services/*": ["services/*"],
             "@utils/*": ["utils/*"],
+            "@mappers/*": ["mappers/*"],
             "@generated/*": ["generated/*"],
             "@models/*": ["models/*"],
             "@constants/*": ["constants/*"],

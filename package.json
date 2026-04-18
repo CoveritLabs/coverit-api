@@ -8,6 +8,7 @@
         "dev": "nodemon",
         "build": "prisma generate && tsc && tsc-alias",
         "start": "node dist/index.js",
+        "worker:email": "ts-node -r tsconfig-paths/register src/workers/email.worker.ts",
         "postinstall": "prisma generate",
         "db:migrate": "prisma migrate dev",
         "db:deploy": "prisma migrate deploy",
@@ -26,7 +27,7 @@
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^8.4.3",
         "@bufbuild/protobuf": "^2.11.0",
-        "@coveritlabs/contracts": "^1.3.1",
+        "@coveritlabs/contracts": "file:vendor/coveritlabs-contracts-1.6.1.tgz",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "argon2": "^0.44.0",
