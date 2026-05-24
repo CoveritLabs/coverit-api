@@ -20,5 +20,28 @@ export type Plain<T> =
         ? ReadonlyArray<Plain<U>>
         : T;
 
+/**
+ * Recursively converts object keys from snake_case to camelCase.
+ * Preserves the original types of the values.
+ */
+type CamelCase<S extends string> = S extends `${infer P}_${infer R}` ? `${P}${Capitalize<CamelCase<R>>}` : S;
+
+/**
+ * Recursively converts all object keys in a type from snake_case to camelCase.
+ * Handles nested objects and arrays.
+ */
+export type Camelized<T> =
+  T extends Array<infer U>
+    ? Array<Camelized<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<Camelized<U>>
+      : T extends object
+        ? {
+            [K in keyof T as K extends string ? CamelCase<K> : K]: Camelized<T[K]>;
+          }
+        : T;
+
+export type DomainDTO<T> = Camelized<Plain<T>>;
+
 // Shared domain models
 export type MessageResponse = Plain<ContractMessageResponse>;
