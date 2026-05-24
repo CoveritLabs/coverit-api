@@ -12,6 +12,7 @@ import {
   toDbCrawlTriggerTypeFilter,
   toPersistedCrawlConfig,
 } from "@mappers/crawlSession.mapper";
+import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
 import {
   type CrawlConfig,
   CrawlConfigSchema,
@@ -34,7 +35,7 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   triggerType: fromDbCrawlTriggerType(session.triggerType),
   crawlConfig: (() => {
     const parsed = CrawlConfigSchema.safeParse(session.config);
-    return parsed.success ? parsed.data : {};
+    return parsed.success ? parsed.data : { ...DEFAULT_CRAWL_CONFIG };
   })(),
   stateCount: session.stateCount,
   transitionCount: session.transitionCount,

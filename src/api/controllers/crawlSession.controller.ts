@@ -46,7 +46,7 @@ export const createSession = async (req: Request, res: Response) => {
   try {
     const { versionId } = AppVersionParamsSchema.parse(req.params);
     const body = CreateCrawlSessionRequestSchema.parse(req.body);
-    const result = await crawlService.createSession(versionId, body.triggerType, body.crawlConfig.crawlerSettings);
+    const result = await crawlService.createSession(versionId, body.triggerType, body.crawlConfig);
     res.status(StatusCodes.CREATED).json(result);
   } catch (e) {
     handleControllerError(res, e);
