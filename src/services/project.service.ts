@@ -211,12 +211,20 @@ export async function addMembers(projectId: string, input: AddMembersRequest): P
   return { message: PROJECT_MESSAGES.ADD_MEMBERS_SUCCESS };
 }
 
-export async function updateMember(projectId: string, input: UpdateMemberRequest): Promise<MessageResponse> {
+export async function updateMember(projectId: string, input: UpdateMemberRequest, actorUserId?: string): Promise<MessageResponse> {
   await assertProjectExists(projectId);
 
   const membership = await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId, userId: input.id } } });
   if (!membership) {
     throw new NotFoundError(PROJECT_MESSAGES.MEMBER_NOT_FOUND);
+  }
+
+  if (actorUserId && input.id === actorUserId) {
+    const adminCount = await prisma.projectMember.count({ where: { projectId, role: ProjectRole.ADMIN } });
+
+    if (membership.role === ProjectRole.ADMIN && adminCount === 1 && input.role !== ProjectRole.ADMIN) {
+      throw new BadRequestError(PROJECT_MESSAGES.ONLY_ADMIN_ROLE_CHANGE_FORBIDDEN);
+    }
   }
 
   await prisma.projectMember.update({ where: { projectId_userId: { projectId, userId: input.id } }, data: { role: input.role as ProjectRole } });
@@ -229,10 +237,47 @@ export async function updateMember(projectId: string, input: UpdateMemberRequest
   return { message: PROJECT_MESSAGES.UPDATE_MEMBER_SUCCESS };
 }
 
+export async function leaveProject(projectId: string, userId: string): Promise<MessageResponse> {
+  await assertProjectExists(projectId);
+
+  const membership = await prisma.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+  });
+  if (!membership) {
+    throw new NotFoundError(PROJECT_MESSAGES.MEMBER_NOT_FOUND);
+  }
+
+  const memberCount = await prisma.projectMember.count({ where: { projectId } });
+
+  if (memberCount <= 1) {
+    return deleteProject(projectId);
+  }
+
+  const adminCount = await prisma.projectMember.count({ where: { projectId, role: ProjectRole.ADMIN } });
+
+  if (membership.role === ProjectRole.ADMIN && adminCount <= 1) {
+    throw new BadRequestError(PROJECT_MESSAGES.ONLY_ADMIN_LEAVE_FORBIDDEN);
+  }
+
+  await prisma.projectMember.delete({ where: { projectId_userId: { projectId, userId } } });
+
+  await Promise.all([
+    cacheDelByPattern(cacheKeys.project.byIdPattern(projectId), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_PROJECT_REMOVE_MEMBERS),
+    cacheDelByPattern(cacheKeys.user.projectsPattern(), CACHE_LOG_CONTEXTS.PROJECT_INVALIDATE_USER_PROJECTS_REMOVE_MEMBERS),
+  ]);
+
+  return { message: PROJECT_MESSAGES.LEAVE_SUCCESS };
+}
+
 export async function removeMembers(projectId: string, input: RemoveMembersRequest): Promise<MessageResponse> {
   await assertProjectExists(projectId);
 
   const userIds = await resolveUserIdsByEmails(input.emails);
+
+  const remainingMembers = await prisma.projectMember.count({ where: { projectId, userId: { notIn: userIds } } });
+  if (remainingMembers <= 0) {
+    return deleteProject(projectId);
+  }
 
   await prisma.projectMember.deleteMany({ where: { projectId, userId: { in: userIds } } });
 
