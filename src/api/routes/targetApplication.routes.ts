@@ -5,7 +5,6 @@
 import { Router } from "express";
 
 import * as targetController from "@api/controllers/targetApplication.controller";
-import * as rcController from "@api/controllers/regressionCodebase.controller";
 import { requireProjectAdmin, requireProjectMember, requireProjectMembership } from "@api/middlewares/requireProjectAccess";
 import { validateBody } from "@api/middlewares/validate";
 import {
@@ -13,8 +12,9 @@ import {
   UpdateTargetApplicationRequestSchema,
   CreateTargetApplicationVersionRequestSchema,
 } from "@models/targetApplication";
-import { CreateRegressionCodebaseRequestSchema, UpdateRegressionCodebaseRequestSchema } from "@models/regressionCodebase";
 import crawlSessionRoutes from "@api/routes/crawlSession.routes";
+import crawlScheduleRoutes from "@api/routes/crawlSchedule.routes";
+import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -35,20 +35,6 @@ router.use("/:appId/versions/:versionId/crawl-sessions", crawlSessionRoutes);
 router.use("/:appId/crawl-schedules", crawlScheduleRoutes);
 
 // Regression codebases
-router.post(
-  "/:appId/regression-codebases",
-  requireProjectAdmin,
-  validateBody(CreateRegressionCodebaseRequestSchema),
-  rcController.createRegressionCodebase,
-);
-router.put(
-  "/:appId/regression-codebases/:codebaseId",
-  requireProjectAdmin,
-  validateBody(UpdateRegressionCodebaseRequestSchema),
-  rcController.updateRegressionCodebase,
-);
-router.delete("/:appId/regression-codebases/:codebaseId", requireProjectAdmin, rcController.deleteRegressionCodebase);
-router.get("/:appId/regression-codebases", requireProjectMembership, rcController.getRegressionCodebases);
-router.get("/:appId/regression-codebases/:codebaseId", requireProjectMembership, rcController.getRegressionCodebase);
+router.use("/:appId/regression-codebases", regressionCodebaseRoutes);
 
 export default router;
