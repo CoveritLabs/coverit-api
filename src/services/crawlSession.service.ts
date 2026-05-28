@@ -13,13 +13,16 @@ import {
   toPersistedCrawlConfig,
 } from "@mappers/crawlSession.mapper";
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
+import { CRAWL_SESSION_MESSAGES } from "@constants/messages";
+import { BadRequestError, ConflictError, NotFoundError } from "@utils/errors";
+import type { MessageResponse } from "@models/common";
 import {
-  type CrawlConfig,
   CrawlConfigSchema,
-  CrawlTriggerType,
+  CodegenConfigSchema,
   type ApplicationVersionCrawlSessionsResponse,
   type CrawlSessionData,
   type GetSessionsQuery,
+  type CreateCrawlSessionRequest,
 } from "@models/crawlSession";
 import { removeCrawlJob, addCrawlJob } from "@queues/crawl.queue";
 import { toIso } from "@utils/date";
@@ -33,10 +36,20 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   appVersionId: session.appVersionId,
   status: fromDbCrawlStatus(session.status),
   triggerType: fromDbCrawlTriggerType(session.triggerType),
+
   crawlConfig: (() => {
     const parsed = CrawlConfigSchema.safeParse(session.config);
     return parsed.success ? parsed.data : { ...DEFAULT_CRAWL_CONFIG };
   })(),
+
+  codegenConfig: (() => {
+    const parsed = CodegenConfigSchema.safeParse(session.codegenConfig);
+    return parsed.success ? parsed.data : undefined;
+  })(),
+
+  regressionCodebaseId: session.regressionCodebaseId ?? undefined,
+  baseUrlSnapshot: session.baseUrlSnapshot ?? undefined,
+  scheduleId: session.scheduleId ?? undefined,
   stateCount: session.stateCount,
   transitionCount: session.transitionCount,
   createdAt: session.createdAt.toISOString(),
@@ -45,7 +58,41 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   errorMessage: session.error ?? undefined,
 });
 
-export async function getSessions(versionId: string, query: GetSessionsQuery): Promise<ApplicationVersionCrawlSessionsResponse> {
+async function requireTargetApplication(projectId: string, appId: string) {
+  const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
+  if (!app || app.projectId !== projectId) {
+    throw new NotFoundError(CRAWL_SESSION_MESSAGES.APPLICATION_NOT_FOUND);
+  }
+  return app;
+}
+
+async function requireApplicationVersion(appId: string, versionId: string) {
+  const version = await prisma.targetApplicationVersion.findFirst({
+    where: { id: versionId, targetApplicationId: appId },
+  });
+  if (!version) {
+    throw new NotFoundError(CRAWL_SESSION_MESSAGES.VERSION_NOT_FOUND);
+  }
+  return version;
+}
+
+async function requireRegressionCodebase(appId: string, regressionCodebaseId: string) {
+  const codebase = await prisma.regressionCodebase.findUnique({ where: { id: regressionCodebaseId } });
+  if (!codebase || codebase.targetApplicationId !== appId) {
+    throw new NotFoundError(CRAWL_SESSION_MESSAGES.CODEBASE_NOT_FOUND);
+  }
+  return codebase;
+}
+
+export async function getSessions(
+  projectId: string,
+  appId: string,
+  versionId: string,
+  query: GetSessionsQuery,
+): Promise<ApplicationVersionCrawlSessionsResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
   const { page, pageSize, status, triggerType } = query;
   const dbStatus = toDbCrawlStatusFilter<DbCrawlStatus>(status);
   const dbTriggerType = toDbCrawlTriggerTypeFilter<DbCrawlTriggerType>(triggerType);
@@ -77,38 +124,98 @@ export async function getSessions(versionId: string, query: GetSessionsQuery): P
   };
 }
 
-export async function createSession(versionId: string, triggerType: CrawlTriggerType, crawlConfig: CrawlConfig): Promise<CrawlSessionData> {
-  const parsedConfig = CrawlConfigSchema.parse(crawlConfig);
+export async function createSession(
+  projectId: string,
+  appId: string,
+  versionId: string,
+  input: CreateCrawlSessionRequest,
+): Promise<CrawlSessionData> {
+  const app = await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  if (input.regressionCodebaseId) {
+    await requireRegressionCodebase(appId, input.regressionCodebaseId);
+  }
+
+  if (!app.baseUrl) {
+    throw new BadRequestError("Target application base URL is required");
+  }
+
+  const parsedConfig = CrawlConfigSchema.parse(input.crawlConfig ?? { ...DEFAULT_CRAWL_CONFIG });
   const persistedConfig = toPersistedCrawlConfig(parsedConfig);
 
   const newSession = await prisma.crawlSession.create({
     data: {
       appVersionId: versionId,
-      triggerType: toDbCrawlTriggerType(triggerType) as unknown as DbCrawlTriggerType,
+      triggerType: toDbCrawlTriggerType(input.triggerType) as unknown as DbCrawlTriggerType,
       config: persistedConfig,
+      regressionCodebaseId: input.regressionCodebaseId ?? null,
+
+      codegenConfig: input.codegenConfig
+        ? {
+            codegenBranch: input.codegenConfig.codegenBranch,
+            prTargetBranch: input.codegenConfig.prTargetBranch,
+            prTitle: input.codegenConfig.prTitle,
+            prBody: input.codegenConfig.prBody,
+            prDraft: input.codegenConfig.prDraft,
+          }
+        : undefined,
+
+      baseUrlSnapshot: app.baseUrl,
     },
   });
   return mapSession(newSession);
 }
 
-export async function getSessionDetails(sessionId: string): Promise<CrawlSessionData> {
-  const session = await prisma.crawlSession.findUniqueOrThrow({
-    where: { id: sessionId },
+export async function getSessionDetails(projectId: string, appId: string, versionId: string, sessionId: string): Promise<CrawlSessionData> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  const session = await prisma.crawlSession.findFirst({
+    where: {
+      id: sessionId,
+      appVersionId: versionId,
+    },
   });
+  if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
   return mapSession(session);
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
-  await removeCrawlJob(sessionId);
-  await prisma.crawlSession.delete({
-    where: { id: sessionId },
+export async function deleteSession(projectId: string, appId: string, versionId: string, sessionId: string): Promise<MessageResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  const session = await prisma.crawlSession.findFirst({
+    where: { id: sessionId, appVersionId: versionId },
   });
+  if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
+
+  if (
+    session.status === PrismaCrawlStatus.RUNNING ||
+    session.status === PrismaCrawlStatus.PAUSED ||
+    session.status === PrismaCrawlStatus.QUEUED ||
+    session.status === PrismaCrawlStatus.NEW
+  ) {
+    await removeCrawlJob(sessionId);
+    await prisma.crawlSession.update({
+      where: { id: sessionId },
+      data: { status: PrismaCrawlStatus.ABORTED, finishedAt: new Date() },
+    });
+    return { message: CRAWL_SESSION_MESSAGES.ABORTED_DELETE_SUCCESS };
+  }
+
+  await prisma.crawlSession.delete({ where: { id: sessionId } });
+  return { message: CRAWL_SESSION_MESSAGES.DELETE_SUCCESS };
 }
 
-export async function startSession(sessionId: string): Promise<void> {
-  const session = await prisma.crawlSession.findUniqueOrThrow({
-    where: { id: sessionId },
+export async function startSession(projectId: string, appId: string, versionId: string, sessionId: string): Promise<MessageResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  const session = await prisma.crawlSession.findFirst({
+    where: { id: sessionId, appVersionId: versionId },
   });
+  if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
 
   if (session.status === PrismaCrawlStatus.NEW) {
     await prisma.crawlSession.update({
@@ -126,7 +233,7 @@ export async function startSession(sessionId: string): Promise<void> {
       throw error;
     }
 
-    return;
+    return { message: CRAWL_SESSION_MESSAGES.STARTED };
   }
 
   if (session.status === PrismaCrawlStatus.PAUSED) {
@@ -134,42 +241,70 @@ export async function startSession(sessionId: string): Promise<void> {
       where: { id: sessionId },
       data: { status: PrismaCrawlStatus.RUNNING },
     });
-    return;
+    return { message: CRAWL_SESSION_MESSAGES.RESUMED };
   }
 
-  throw new Error(`Cannot start session with status ${session.status}`);
+  if (session.status === PrismaCrawlStatus.QUEUED || session.status === PrismaCrawlStatus.RUNNING) {
+    return { message: CRAWL_SESSION_MESSAGES.ALREADY_STARTED };
+  }
+
+  throw new ConflictError(CRAWL_SESSION_MESSAGES.INVALID_STATUS);
 }
 
-export async function abortSession(sessionId: string): Promise<void> {
-  const session = await prisma.crawlSession.findUniqueOrThrow({
-    where: { id: sessionId },
-  });
+export async function abortSession(projectId: string, appId: string, versionId: string, sessionId: string): Promise<MessageResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
 
-  if (session.status !== PrismaCrawlStatus.RUNNING && session.status !== PrismaCrawlStatus.PAUSED && session.status !== PrismaCrawlStatus.QUEUED) {
-    throw new Error(`Cannot abort session with status ${session.status}`);
+  const session = await prisma.crawlSession.findFirst({
+    where: { id: sessionId, appVersionId: versionId },
+  });
+  if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
+
+  if (session.status === PrismaCrawlStatus.ABORTED) {
+    return { message: CRAWL_SESSION_MESSAGES.ALREADY_ABORTED };
+  }
+
+  if (
+    session.status !== PrismaCrawlStatus.RUNNING &&
+    session.status !== PrismaCrawlStatus.PAUSED &&
+    session.status !== PrismaCrawlStatus.QUEUED &&
+    session.status !== PrismaCrawlStatus.NEW
+  ) {
+    throw new ConflictError(CRAWL_SESSION_MESSAGES.INVALID_STATUS);
   }
 
   await prisma.crawlSession.update({
     where: { id: sessionId },
-    data: { status: PrismaCrawlStatus.ABORTED },
+    data: { status: PrismaCrawlStatus.ABORTED, finishedAt: new Date() },
   });
 
-  if (session.status === PrismaCrawlStatus.QUEUED) {
+  if (session.status === PrismaCrawlStatus.QUEUED || session.status === PrismaCrawlStatus.NEW) {
     await removeCrawlJob(sessionId);
   }
+
+  return { message: CRAWL_SESSION_MESSAGES.ABORTED };
 }
 
-export async function pauseSession(sessionId: string): Promise<void> {
-  const session = await prisma.crawlSession.findUniqueOrThrow({
-    where: { id: sessionId },
+export async function pauseSession(projectId: string, appId: string, versionId: string, sessionId: string): Promise<MessageResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  const session = await prisma.crawlSession.findFirst({
+    where: { id: sessionId, appVersionId: versionId },
   });
+  if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
 
   if (session.status !== PrismaCrawlStatus.RUNNING) {
-    throw new Error(`Cannot pause session with status ${session.status}`);
+    if (session.status === PrismaCrawlStatus.PAUSED) {
+      return { message: CRAWL_SESSION_MESSAGES.ALREADY_PAUSED };
+    }
+    throw new ConflictError(CRAWL_SESSION_MESSAGES.INVALID_STATUS);
   }
 
   await prisma.crawlSession.update({
     where: { id: sessionId },
     data: { status: PrismaCrawlStatus.PAUSED },
   });
+
+  return { message: CRAWL_SESSION_MESSAGES.PAUSED };
 }

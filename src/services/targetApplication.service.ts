@@ -5,6 +5,8 @@
 import prisma from "@lib/prisma";
 import { TARGET_APPLICATION_MESSAGES } from "@constants/messages";
 import { ConflictError, NotFoundError } from "@utils/errors";
+import { removeCrawlJob } from "@queues/crawl.queue";
+import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
 import type {
   CreateTargetApplicationRequest,
   UpdateTargetApplicationRequest,
@@ -40,6 +42,24 @@ export async function deleteTargetApplication(projectId: string, appId: string):
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
 
+  const sessions = await prisma.crawlSession.findMany({
+    where: {
+      appVersion: { targetApplicationId: appId },
+      status: { in: [PrismaCrawlStatus.NEW, PrismaCrawlStatus.QUEUED, PrismaCrawlStatus.RUNNING, PrismaCrawlStatus.PAUSED] },
+    },
+    select: { id: true },
+  });
+
+  await Promise.all(
+    sessions.map(async (session) => {
+      await removeCrawlJob(session.id);
+      await prisma.crawlSession.update({
+        where: { id: session.id },
+        data: { status: PrismaCrawlStatus.ABORTED, finishedAt: new Date() },
+      });
+    }),
+  );
+
   await prisma.targetApplication.delete({ where: { id: appId } });
   return { message: TARGET_APPLICATION_MESSAGES.DELETE_SUCCESS };
 }
@@ -57,7 +77,11 @@ export async function getTargetApplication(projectId: string, appId: string): Pr
   return { id: app.id, name: app.name, baseUrl: app.baseUrl, versions: app.versions.map((v) => ({ id: v.id, version: v.version })) };
 }
 
-export async function createTargetApplicationVersion(projectId: string, appId: string, input: CreateTargetApplicationVersionRequest) {
+export async function createTargetApplicationVersion(
+  projectId: string,
+  appId: string,
+  input: CreateTargetApplicationVersionRequest,
+): Promise<CreateTargetApplicationResponse> {
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
 
@@ -68,12 +92,35 @@ export async function createTargetApplicationVersion(projectId: string, appId: s
   return { id: ver.id };
 }
 
-export async function deleteTargetApplicationVersion(projectId: string, appId: string, versionId: string) {
+export async function deleteTargetApplicationVersion(projectId: string, appId: string, versionId: string): Promise<MessageResponse> {
   const ver = await prisma.targetApplicationVersion.findUnique({ where: { id: versionId } });
   if (!ver) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.VERSION_NOT_FOUND);
 
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId || ver.targetApplicationId !== appId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
+
+  const sessions = await prisma.crawlSession.findMany({
+    where: {
+      appVersionId: versionId,
+      status: { in: [PrismaCrawlStatus.NEW, PrismaCrawlStatus.QUEUED, PrismaCrawlStatus.RUNNING, PrismaCrawlStatus.PAUSED] },
+    },
+    select: { id: true },
+  });
+
+  await Promise.all(
+    sessions.map(async (session) => {
+      await removeCrawlJob(session.id);
+      await prisma.crawlSession.update({
+        where: { id: session.id },
+        data: { status: PrismaCrawlStatus.ABORTED, finishedAt: new Date() },
+      });
+    }),
+  );
+
+  await prisma.crawlSchedule.updateMany({
+    where: { versionId },
+    data: { isActive: false, nextRunAt: null },
+  });
 
   await prisma.targetApplicationVersion.delete({ where: { id: versionId } });
   return { message: TARGET_APPLICATION_MESSAGES.VERSION_DELETE_SUCCESS };

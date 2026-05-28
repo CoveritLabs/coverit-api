@@ -31,6 +31,9 @@ router.delete("/:appId/versions/:versionId", requireProjectAdmin, targetControll
 
 router.use("/:appId/versions/:versionId/crawl-sessions", crawlSessionRoutes);
 
+// Crawl schedules
+router.use("/:appId/crawl-schedules", crawlScheduleRoutes);
+
 // Regression codebases
 router.post(
   "/:appId/regression-codebases",

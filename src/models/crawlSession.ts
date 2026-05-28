@@ -8,6 +8,7 @@ import {
   type CrawlConfig as ContractCrawlConfig,
   type CrawlerRunSettings as ContractCrawlerRunSettings,
   type InputDefaultsConfig as ContractInputDefaultsConfig,
+  type CodegenConfig as ContractCodegenConfig,
   type CreateCrawlSessionRequest as ContractCreateCrawlSessionRequest,
   type CrawlSessionData as ContractCrawlSessionData,
   type ApplicationVersionCrawlSessionsResponse as ContractApplicationVersionCrawlSessionsResponse,
@@ -22,6 +23,7 @@ import type { Plain } from "./common";
 export type CrawlerRunSettings = Plain<ContractCrawlerRunSettings>;
 export type InputDefaultsConfig = Plain<ContractInputDefaultsConfig>;
 export type CrawlConfig = Plain<ContractCrawlConfig>;
+export type CodegenConfig = Plain<ContractCodegenConfig>;
 export type CreateCrawlSessionRequest = Plain<ContractCreateCrawlSessionRequest>;
 export type CrawlSessionData = Plain<ContractCrawlSessionData>;
 export type ApplicationVersionCrawlSessionsResponse = Plain<ContractApplicationVersionCrawlSessionsResponse>;
@@ -68,16 +70,31 @@ export const CrawlConfigSchema = z
   })
   .loose() satisfies ZodType<CrawlConfig>;
 
+export const CodegenConfigSchema = z.object({
+  codegenBranch: z.string().min(1).max(200),
+  prTargetBranch: z.string().min(1).max(200),
+  prTitle: z.string().max(200).optional(),
+  prBody: z.string().max(5_000).optional(),
+  prDraft: z.boolean().optional(),
+}) satisfies ZodType<CodegenConfig>;
+
 export const CreateCrawlSessionRequestSchema = z.object({
   triggerType: z.enum(CrawlTriggerType),
   crawlConfig: CrawlConfigSchema.optional().default(() => ({ ...DEFAULT_CRAWL_CONFIG })),
+  regressionCodebaseId: z.uuid().optional(),
+  codegenConfig: CodegenConfigSchema.optional(),
 }) satisfies ZodType<CreateCrawlSessionRequest>;
 
-export const AppVersionParamsSchema = z.object({
+export const AppParamsSchema = z.object({
+  projectId: z.uuid(),
+  appId: z.uuid(),
+});
+
+export const AppVersionParamsSchema = AppParamsSchema.extend({
   versionId: z.uuid(),
 });
 
-export const CrawlSessionParamsSchema = z.object({
+export const CrawlSessionParamsSchema = AppVersionParamsSchema.extend({
   crawlSessionId: z.uuid(),
 });
 

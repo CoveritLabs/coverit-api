@@ -2,8 +2,8 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import { CrawlStatus as PrismaCrawlStatus, CrawlTriggerType as PrismaCrawlTriggerType, type Prisma } from "@generated/prisma/client";
-import { CrawlStatus, CrawlTriggerType, type CrawlConfig } from "@models/crawlSession";
+import { CrawlStatus as PrismaCrawlStatus, CrawlTriggerType as PrismaCrawlTriggerType, Prisma } from "@generated/prisma/client";
+import { CrawlStatus, CrawlTriggerType, type CrawlConfig, type CodegenConfig } from "@models/crawlSession";
 
 export const toDbCrawlStatus = (status: CrawlStatus): PrismaCrawlStatus => {
   const key = CrawlStatus[status] as unknown as keyof typeof PrismaCrawlStatus;
@@ -72,4 +72,16 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
   }
 
   return persisted;
+};
+
+export const toPersistedCodegenConfig = (config?: CodegenConfig | null): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput => {
+  return config
+    ? {
+        codegenBranch: config.codegenBranch,
+        prTargetBranch: config.prTargetBranch,
+        prTitle: config.prTitle,
+        prBody: config.prBody,
+        prDraft: config.prDraft,
+      }
+    : Prisma.JsonNull;
 };

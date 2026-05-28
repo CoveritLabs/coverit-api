@@ -7,3 +7,5 @@ export * from "./project";
 export * from "./targetApplication";
 export * from "./regressionCodebase";
 export * from "./user";
+export * from "./crawlSession";
+export * from "./crawlSchedule";
