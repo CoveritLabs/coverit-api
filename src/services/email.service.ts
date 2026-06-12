@@ -6,13 +6,26 @@ import { env } from "@config/env";
 import { logger } from "@services/logger.service";
 import { Resend } from "resend";
 
-const resend = new Resend(env.RESEND_API_KEY);
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!env.RESEND_API_KEY) {
+    throw new Error("Missing RESEND_API_KEY");
+  }
+
+  if (!resend) {
+    resend = new Resend(env.RESEND_API_KEY);
+  }
+
+  return resend;
+}
 
 export async function sendResetEmail(email: string, resetUrl: string, name: string): Promise<void> {
   const from = env.RESET_PASSWORD_EMAIL;
   const templateId = env.RESET_PASSWORD_TEMPLATE_ID;
+  const resendClient = getResendClient();
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await resendClient.emails.send({
     from,
     to: [email],
     subject: "Reset your Coverit password",

@@ -139,6 +139,7 @@ model TargetApplicationVersion {
   targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
   crawlSessions CrawlSession[]
   crawlSchedules CrawlSchedule[]
+  testFlows      TestFlow[]
   @@unique([targetApplicationId, version])
   @@map("target_application_versions")
 }
@@ -210,6 +211,59 @@ model CrawlSession {
   appVersion      TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
   regressionCodebase RegressionCodebase? @relation(fields: [regressionCodebaseId], references: [id], onDelete: SetNull)
   schedule CrawlSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  testFlows     TestFlow[]
+  testFlowSteps TestFlowStep[]
 
   @@map("crawl_sessions")
+}
+
+
+model TestFlow {
+  id                  String   @id @default(uuid()) @db.Uuid
+  crawlSessionId      String   @map("crawl_session_id") @db.Uuid
+  appVersionId        String   @map("app_version_id") @db.Uuid
+  targetStateHash     String   @map("target_state_hash")
+  checkpointStateHash String   @map("checkpoint_state_hash")
+  checkpointUrl       String   @map("checkpoint_url")
+  isClipped           Boolean  @map("is_clipped")
+  stepCount           Int      @map("step_count")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  crawlSession  CrawlSession             @relation(fields: [crawlSessionId], references: [id], onDelete: Cascade)
+  appVersion    TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
+  compositions  TestFlowComposition[]
+
+  @@index([crawlSessionId])
+  @@index([appVersionId, targetStateHash])
+  @@map("test_flows")
+}
+
+model TestFlowStep {
+  id                 String  @id @default(uuid()) @db.Uuid
+  crawlSessionId     String  @map("crawl_session_id") @db.Uuid
+  sourceStateHash    String  @map("source_state_hash")
+  targetStateHash    String  @map("target_state_hash")
+  actionType         String  @map("action_type")
+  actionFingerprint  String  @map("action_fingerprint")
+  transition         Json
+
+  crawlSession  CrawlSession          @relation(fields: [crawlSessionId], references: [id], onDelete: Cascade)
+  compositions  TestFlowComposition[]
+
+  @@unique([crawlSessionId, actionFingerprint])
+  @@map("test_flow_steps")
+}
+
+model TestFlowComposition {
+  id         String @id @default(uuid()) @db.Uuid
+  flowId     String @map("flow_id") @db.Uuid
+  stepId     String @map("step_id") @db.Uuid
+  stepOrder  Int    @map("step_order")
+
+  flow  TestFlow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  step  TestFlowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([flowId, stepOrder])
+  @@index([flowId])
+  @@map("test_flow_compositions")
 }
