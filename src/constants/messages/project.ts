@@ -36,8 +36,13 @@ export const PROJECT_MESSAGES = {
   REMOVE_MEMBERS_FAILURE: "Failed to remove members",
   REMOVE_MEMBERS_INVALID_USER: "One or more user emails are invalid",
 
+  // leave project
+  LEAVE_SUCCESS: "Left project successfully",
+  ONLY_ADMIN_LEAVE_FORBIDDEN: "Cannot leave project as the only admin.",
+
   // update member role
   MEMBER_NOT_FOUND: "Project member not found",
+  ONLY_ADMIN_ROLE_CHANGE_FORBIDDEN: "Cannot change role of the only project admin",
   UPDATE_MEMBER_SUCCESS: "Member updated successfully",
 } as const;
 

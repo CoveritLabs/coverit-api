@@ -45,6 +45,8 @@ describe("project.service", () => {
       findMany: jest.fn(),
       createMany: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
+      delete: jest.fn(),
       deleteMany: jest.fn(),
     };
   });
@@ -199,7 +201,7 @@ describe("project.service", () => {
     mockPrisma.project.findUnique.mockResolvedValue({ id: "p1" });
     mockPrisma.projectMember.findUnique.mockResolvedValue(null);
 
-    await expect(svc.updateMember("p1", { id: "u1", role: ProjectRole.MEMBER } as any)).rejects.toThrow(NotFoundError);
+    await expect(svc.updateMember("p1", { id: "u1", role: ProjectRole.MEMBER } as any, "u1")).rejects.toThrow(NotFoundError);
   });
 
   test("updateMember - success updates and invalidates cache", async () => {
@@ -207,7 +209,7 @@ describe("project.service", () => {
     mockPrisma.projectMember.findUnique.mockResolvedValue({ userId: "u1" });
     mockPrisma.projectMember.update.mockResolvedValue({});
 
-    const res = await svc.updateMember("p1", { id: "u1", role: ProjectRole.MEMBER } as any);
+    const res = await svc.updateMember("p1", { id: "u1", role: ProjectRole.MEMBER } as any, "u1");
     expect(res).toEqual({ message: PROJECT_MESSAGES.UPDATE_MEMBER_SUCCESS });
     expect(mockPrisma.projectMember.update).toHaveBeenCalled();
     expect(mockCache.cacheDelByPattern).toHaveBeenCalled();

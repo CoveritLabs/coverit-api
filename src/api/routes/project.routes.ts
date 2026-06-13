@@ -32,6 +32,9 @@ router.post("/:projectId/members", requireProjectAdmin, validateBody(AddMembersR
 router.put("/:projectId/members", requireProjectAdmin, validateBody(UpdateMemberRequestSchema), projectController.updateProjectMember);
 router.delete("/:projectId/members", requireProjectAdmin, validateBody(RemoveMembersRequestSchema), projectController.removeProjectMembers);
 
+// Leave project
+router.post("/:projectId/leave", requireProjectMembership, projectController.leaveProject);
+
 // Target applications and related entities
 router.use("/:projectId/target-applications", targetAppRoutes);
 

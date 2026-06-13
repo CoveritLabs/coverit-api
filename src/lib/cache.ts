@@ -64,6 +64,9 @@ export const cacheKeys = {
     byId: (codebaseId: string): string => `regression_codebase:${codebaseId}`,
     byApp: (appId: string): string => `app:regression_codebases:${appId}`,
   },
+  crawlSession: {
+    pid: (sessionId: string): string => `session:${sessionId}:pid`,
+  },
 } as const;
 
 export async function cacheGetJSON<T>(key: string, context?: string): Promise<T | CacheMiss> {
