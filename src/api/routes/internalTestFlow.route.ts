@@ -6,8 +6,8 @@ import { Router } from "express";
 import { saveFlows, SaveAllFlowsBodySchema } from "@api/controllers/testFlow.controller";
 import { validateBody } from "@api/middlewares/validate";
 
-// Mounted at /internal in app.ts
-// POST /internal/sessions/:sessionId/flows
+// Mounted at `${API_PREFIX}/internal` in app.ts
+// POST `${API_PREFIX}/internal/sessions/:sessionId/flows`
 const router = Router();
 
 router.post("/sessions/:sessionId/flows", validateBody(SaveAllFlowsBodySchema), saveFlows);

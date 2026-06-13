@@ -49,7 +49,7 @@ app.get("/docs.json", (_req: Request, res: Response) => {
 const apiBase = env.API_PREFIX;
 app.use(`${apiBase}/auth`, authRoutes);
 app.use(`${apiBase}/projects`, projectRoutes);
-app.use("/internal", internalTestFlowRouter);
+app.use(`${apiBase}/internal`, internalTestFlowRouter);
 
 app.use(errorHandler);
 
