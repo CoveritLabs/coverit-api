@@ -93,6 +93,26 @@ enum CrawlScheduleMode {
   FIXED_VERSION
 }
 
+enum RegressionRunStatus {
+  RUNNING
+  PASSED
+  FAILED
+}
+
+enum RegressionScenarioStatus {
+  RUNNING
+  PASSED
+  FAILED
+}
+
+enum RegressionArtifactKind {
+  FAILURE
+  LOG
+  HEALING
+  SUMMARY
+  OTHER
+}
+
 model ProjectMember {
   id        String   @id @default(uuid()) @db.Uuid
   projectId String   @map("project_id") @db.Uuid
@@ -113,17 +133,22 @@ model ProjectMember {
 /////////////////////
 
 model TargetApplication {
-  id        String   @id @default(uuid()) @db.Uuid
-  projectId String   @map("project_id") @db.Uuid
-  name      String
-  baseUrl   String   @map("base_url")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(uuid()) @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  name            String
+  baseUrl         String    @map("base_url")
+  apiKeyHash      String?   @unique @map("api_key_hash")
+  apiKeyPreview   String?   @map("api_key_preview")
+  apiKeyCreatedAt DateTime? @map("api_key_created_at")
+  apiKeyRotatedAt DateTime? @map("api_key_rotated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   versions TargetApplicationVersion[]
   regressionCodebases RegressionCodebase[]
   crawlSchedules CrawlSchedule[]
+  regressionRuns RegressionRun[]
 
   @@unique([projectId, name])
   @@map("target_applications")
@@ -140,8 +165,109 @@ model TargetApplicationVersion {
   crawlSessions CrawlSession[]
   crawlSchedules CrawlSchedule[]
   testFlows      TestFlow[]
+  regressionRuns RegressionRun[]
   @@unique([targetApplicationId, version])
   @@map("target_application_versions")
+}
+
+model RegressionRun {
+  id                  String              @id @default(uuid()) @db.Uuid
+  runId               String              @map("run_id")
+  targetApplicationId String              @map("target_application_id") @db.Uuid
+  versionId           String?             @map("version_id") @db.Uuid
+  status              RegressionRunStatus @default(RUNNING)
+  startedAt           DateTime?           @map("started_at")
+  finishedAt          DateTime?           @map("finished_at")
+  durationMs          Int?                @map("duration_ms")
+  passedCount         Int                 @default(0) @map("passed_count")
+  failedCount         Int                 @default(0) @map("failed_count")
+  warningCount        Int                 @default(0) @map("warning_count")
+  summary             Json?
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  version           TargetApplicationVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  scenarios         RegressionScenario[]
+  events            RegressionEvent[]
+  artifacts         RegressionArtifact[]
+
+  @@unique([targetApplicationId, runId])
+  @@index([targetApplicationId, versionId, createdAt])
+  @@map("regression_runs")
+}
+
+model RegressionScenario {
+  id           String                   @id @default(uuid()) @db.Uuid
+  runDbId      String                   @map("run_db_id") @db.Uuid
+  scenarioKey  String                   @map("scenario_key")
+  featureName  String?                  @map("feature_name")
+  scenarioName String?                  @map("scenario_name")
+  title        String?
+  file         String?
+  line         Int?
+  status       RegressionScenarioStatus @default(RUNNING)
+  startedAt    DateTime?                @map("started_at")
+  finishedAt   DateTime?                @map("finished_at")
+  durationMs   Int?                     @map("duration_ms")
+  passedCount  Int                      @default(0) @map("passed_count")
+  failedCount  Int                      @default(0) @map("failed_count")
+  warningCount Int                      @default(0) @map("warning_count")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+
+  run       RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  events    RegressionEvent[]
+  artifacts RegressionArtifact[]
+
+  @@unique([runDbId, scenarioKey])
+  @@index([runDbId, status])
+  @@map("regression_scenarios")
+}
+
+model RegressionEvent {
+  id           String   @id
+  runDbId      String   @map("run_db_id") @db.Uuid
+  scenarioId   String?  @map("scenario_id") @db.Uuid
+  type         String
+  timestamp    DateTime
+  featureName  String?  @map("feature_name")
+  scenarioName String?  @map("scenario_name")
+  stepId       String?  @map("step_id")
+  stepLabel    String?  @map("step_label")
+  stepType     String?  @map("step_type")
+  status       String?
+  logLevel     String?  @map("log_level")
+  hasFailure   Boolean  @default(false) @map("has_failure")
+  hasHealing   Boolean  @default(false) @map("has_healing")
+  payload      Json
+  raw          Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  run      RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([runDbId, timestamp])
+  @@index([scenarioId, timestamp])
+  @@index([runDbId, type, timestamp])
+  @@map("regression_events")
+}
+
+model RegressionArtifact {
+  id         String                 @id @default(uuid()) @db.Uuid
+  runDbId    String                 @map("run_db_id") @db.Uuid
+  scenarioId String?                @map("scenario_id") @db.Uuid
+  kind       RegressionArtifactKind
+  name       String
+  data       Json
+  createdAt  DateTime               @default(now()) @map("created_at")
+
+  run      RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([runDbId, kind])
+  @@index([scenarioId])
+  @@map("regression_artifacts")
 }
 
 //////////////////////
