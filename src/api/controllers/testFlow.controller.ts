@@ -6,15 +6,9 @@ import { Request, Response, NextFunction } from "express";
 import { z } from "@utils/zod";
 import { saveAllFlows } from "@services/testFlow.service";
 
-export const FlowStepSchema = z.object({
-  state_hash: z.string(),
-  transition: z.record(z.string(), z.unknown()).nullable(),
-});
-
 export const SerializedFlowSchema = z.object({
   checkpoint: z.string(),
-  is_clipped: z.boolean(),
-  path: z.array(FlowStepSchema),
+  transition_refs: z.array(z.string()),
 });
 
 export const SaveAllFlowsBodySchema = z.object({
