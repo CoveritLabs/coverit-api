@@ -110,7 +110,16 @@ enum RegressionArtifactKind {
   LOG
   HEALING
   SUMMARY
+  SCREENSHOT
+  VIDEO
+  TRACE
+  EVENTS
   OTHER
+}
+
+enum RegressionArtifactUploadStatus {
+  UPLOADED
+  FAILED
 }
 
 model ProjectMember {
@@ -254,19 +263,30 @@ model RegressionEvent {
 }
 
 model RegressionArtifact {
-  id         String                 @id @default(uuid()) @db.Uuid
-  runDbId    String                 @map("run_db_id") @db.Uuid
-  scenarioId String?                @map("scenario_id") @db.Uuid
-  kind       RegressionArtifactKind
-  name       String
-  data       Json
-  createdAt  DateTime               @default(now()) @map("created_at")
+  id             String                         @id @default(uuid()) @db.Uuid
+  runDbId        String                         @map("run_db_id") @db.Uuid
+  scenarioId     String?                        @map("scenario_id") @db.Uuid
+  kind           RegressionArtifactKind
+  name           String
+  data           Json
+  contentType    String?                        @map("content_type")
+  sizeBytes      BigInt?                        @map("size_bytes")
+  storageProvider String?                       @map("storage_provider")
+  storageUri     String?                        @map("storage_uri")
+  storagePath    String?                        @map("storage_path")
+  checksumSha256 String?                        @map("checksum_sha256")
+  uploadStatus   RegressionArtifactUploadStatus? @map("upload_status")
+  uploadError    String?                        @map("upload_error") @db.Text
+  metadata       Json?
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
 
   run      RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
   scenario RegressionScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
 
   @@index([runDbId, kind])
   @@index([scenarioId])
+  @@index([runDbId, uploadStatus])
   @@map("regression_artifacts")
 }
 
