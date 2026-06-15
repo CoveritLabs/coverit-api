@@ -11,6 +11,7 @@ import type {
   CreateTargetApplicationResponse as ContractCreateTargetApplicationResponse,
   TargetApplicationResponse as ContractTargetApplicationResponse,
   CreateTargetApplicationVersionRequest as ContractCreateTargetApplicationVersionRequest,
+  RotateTargetApplicationApiKeyResponse as ContractRotateTargetApplicationApiKeyResponse,
 } from "@coveritlabs/contracts";
 import { z } from "@utils/zod";
 import type { ZodType } from "zod";
@@ -19,8 +20,10 @@ import type { Plain } from "./common";
 export type CreateTargetApplicationRequest = Plain<ContractCreateTargetApplicationRequest>;
 export type UpdateTargetApplicationRequest = Plain<ContractUpdateTargetApplicationRequest>;
 export type CreateTargetApplicationResponse = Plain<ContractCreateTargetApplicationResponse>;
+export type CreateTargetApplicationVersionResponse = Pick<Plain<ContractCreateTargetApplicationResponse>, "id">;
 export type TargetApplicationResponse = Plain<ContractTargetApplicationResponse>;
 export type CreateTargetApplicationVersionRequest = Plain<ContractCreateTargetApplicationVersionRequest>;
+export type RotateTargetApplicationApiKeyResponse = Plain<ContractRotateTargetApplicationApiKeyResponse>;
 
 export const CreateTargetApplicationRequestSchema = z.object({
   name: z.requiredString(TARGET_APPLICATION_VALIDATION.NAME_REQUIRED).min(1, TARGET_APPLICATION_VALIDATION.NAME_MIN_LENGTH),

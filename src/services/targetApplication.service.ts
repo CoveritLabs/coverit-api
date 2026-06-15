@@ -7,12 +7,16 @@ import { TARGET_APPLICATION_MESSAGES } from "@constants/messages";
 import { ConflictError, NotFoundError } from "@utils/errors";
 import { removeCrawlJob } from "@queues/crawl.queue";
 import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
+import { generateApplicationApiKey, hashToken, previewApplicationApiKey } from "@utils/token";
+import { mapTargetApplication } from "@mappers/targetApplication.mapper";
 import type {
   CreateTargetApplicationRequest,
   UpdateTargetApplicationRequest,
   CreateTargetApplicationVersionRequest,
   TargetApplicationResponse,
   CreateTargetApplicationResponse,
+  CreateTargetApplicationVersionResponse,
+  RotateTargetApplicationApiKeyResponse,
 } from "@models/targetApplication";
 import type { MessageResponse } from "@models/common";
 
@@ -20,8 +24,19 @@ export async function createTargetApplication(projectId: string, input: CreateTa
   const existing = await prisma.targetApplication.findFirst({ where: { projectId, name: input.name } });
   if (existing) throw new ConflictError(TARGET_APPLICATION_MESSAGES.EXISTING_APPLICATION);
 
-  const app = await prisma.targetApplication.create({ data: { projectId, name: input.name, baseUrl: input.baseUrl } });
-  return { id: app.id };
+  const apiKey = generateApplicationApiKey();
+  const apiKeyPreview = previewApplicationApiKey(apiKey);
+  const app = await prisma.targetApplication.create({
+    data: {
+      projectId,
+      name: input.name,
+      baseUrl: input.baseUrl,
+      apiKeyHash: hashToken(apiKey),
+      apiKeyPreview,
+      apiKeyCreatedAt: new Date(),
+    },
+  });
+  return { id: app.id, apiKey, apiKeyPreview };
 }
 
 export async function updateTargetApplication(projectId: string, appId: string, input: UpdateTargetApplicationRequest): Promise<MessageResponse> {
@@ -67,21 +82,40 @@ export async function deleteTargetApplication(projectId: string, appId: string):
 export async function getTargetApplications(projectId: string): Promise<TargetApplicationResponse[]> {
   const apps = await prisma.targetApplication.findMany({ where: { projectId }, include: { versions: true } });
 
-  return apps.map((a) => ({ id: a.id, name: a.name, baseUrl: a.baseUrl, versions: a.versions.map((v) => ({ id: v.id, version: v.version })) }));
+  return apps.map(mapTargetApplication);
 }
 
 export async function getTargetApplication(projectId: string, appId: string): Promise<TargetApplicationResponse> {
   const app = await prisma.targetApplication.findUnique({ where: { id: appId }, include: { versions: true } });
   if (!app || app.projectId !== projectId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
 
-  return { id: app.id, name: app.name, baseUrl: app.baseUrl, versions: app.versions.map((v) => ({ id: v.id, version: v.version })) };
+  return mapTargetApplication(app);
+}
+
+export async function rotateTargetApplicationApiKey(projectId: string, appId: string): Promise<RotateTargetApplicationApiKeyResponse> {
+  const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
+  if (!app || app.projectId !== projectId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
+
+  const apiKey = generateApplicationApiKey();
+  const apiKeyPreview = previewApplicationApiKey(apiKey);
+  await prisma.targetApplication.update({
+    where: { id: appId },
+    data: {
+      apiKeyHash: hashToken(apiKey),
+      apiKeyPreview,
+      apiKeyRotatedAt: new Date(),
+      apiKeyCreatedAt: app.apiKeyCreatedAt ?? new Date(),
+    },
+  });
+
+  return { apiKey, apiKeyPreview };
 }
 
 export async function createTargetApplicationVersion(
   projectId: string,
   appId: string,
   input: CreateTargetApplicationVersionRequest,
-): Promise<CreateTargetApplicationResponse> {
+): Promise<CreateTargetApplicationVersionResponse> {
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) throw new NotFoundError(TARGET_APPLICATION_MESSAGES.NOT_FOUND);
 

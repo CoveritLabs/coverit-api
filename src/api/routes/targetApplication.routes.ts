@@ -24,6 +24,7 @@ router.put("/:appId", requireProjectAdmin, validateBody(UpdateTargetApplicationR
 router.delete("/:appId", requireProjectAdmin, targetController.deleteTargetApplication);
 router.get("/", requireProjectMembership, targetController.getTargetApplications);
 router.get("/:appId", requireProjectMembership, targetController.getTargetApplication);
+router.post("/:appId/api-key/rotate", requireProjectAdmin, targetController.rotateApiKey);
 
 // Versions
 router.post("/:appId/versions", requireProjectMember, validateBody(CreateTargetApplicationVersionRequestSchema), targetController.createVersion);
