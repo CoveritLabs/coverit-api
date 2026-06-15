@@ -10,6 +10,7 @@ jest.mock("@services/targetApplication.service", () => ({
   getTargetApplication: jest.fn(),
   createTargetApplicationVersion: jest.fn(),
   deleteTargetApplicationVersion: jest.fn(),
+  rotateTargetApplicationApiKey: jest.fn(),
 }));
 
 import * as controller from "@api/controllers/targetApplication.controller";
@@ -25,7 +26,7 @@ describe("targetApplication.controller", () => {
   beforeEach(() => jest.resetAllMocks());
 
   test("createTargetApplication - success", async () => {
-    (svc.createTargetApplication as jest.Mock).mockResolvedValue({ id: "a1" });
+    (svc.createTargetApplication as jest.Mock).mockResolvedValue({ id: "a1", apiKey: "key", apiKeyPreview: "cvit_...abc" });
 
     const req: any = { params: { projectId: "p1" }, body: { name: "app" } };
     const res = makeRes();
@@ -34,7 +35,7 @@ describe("targetApplication.controller", () => {
     await controller.createTargetApplication(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.status().json).toHaveBeenCalledWith({ id: "a1" });
+    expect(res.status().json).toHaveBeenCalledWith({ id: "a1", apiKey: "key", apiKeyPreview: "cvit_...abc" });
   });
 
   test("updateTargetApplication - success", async () => {
@@ -95,6 +96,18 @@ describe("targetApplication.controller", () => {
     const resDelete = makeRes();
     await controller.deleteVersion(reqDelete, resDelete, next);
     expect(resDelete.status).toHaveBeenCalledWith(200);
+  });
+
+  test("rotateApiKey - success", async () => {
+    (svc.rotateTargetApplicationApiKey as jest.Mock).mockResolvedValue({ apiKey: "key", apiKeyPreview: "cvit_...abc" });
+
+    const req: any = { params: { projectId: "p1", appId: "a1" } };
+    const res = makeRes();
+    const next = jest.fn();
+
+    await controller.rotateApiKey(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status().json).toHaveBeenCalledWith({ apiKey: "key", apiKeyPreview: "cvit_...abc" });
   });
 
   test("controller errors call next", async () => {
