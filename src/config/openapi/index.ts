@@ -5,6 +5,7 @@
 import "./auth";
 import "./project";
 import "./targetApplication";
+import "./regressionRun";
 import { registry } from "./registry";
 
 registry.registerComponent("securitySchemes", "bearerAuth", {

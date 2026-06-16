@@ -15,6 +15,7 @@ import {
 import crawlSessionRoutes from "@api/routes/crawlSession.routes";
 import crawlScheduleRoutes from "@api/routes/crawlSchedule.routes";
 import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
+import regressionRunRoutes from "@api/routes/regressionRun.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -37,5 +38,8 @@ router.use("/:appId/crawl-schedules", crawlScheduleRoutes);
 
 // Regression codebases
 router.use("/:appId/regression-codebases", regressionCodebaseRoutes);
+
+// Regression runs and artifacts
+router.use("/:appId/runs", regressionRunRoutes);
 
 export default router;
