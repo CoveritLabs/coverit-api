@@ -14,6 +14,7 @@ import {
 } from "@models/regressionRun";
 import * as regressionRunService from "@services/regressionRun.service";
 import { BadRequestError } from "@utils/errors";
+import { ARTIFACT_STORAGE, ARTIFACT_STORAGE_MESSAGES } from "@constants/artifactStorage";
 
 export async function ingestEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -106,7 +107,7 @@ export async function listArtifacts(req: Request, res: Response, next: NextFunct
     const { projectId, appId, runId } = req.params;
     const query = RegressionArtifactListQuerySchema.parse(req.query);
     const response = await regressionRunService.listArtifacts(projectId, appId, runId, query);
-    res.status(StatusCodes.OK).json({ artifacts: response });
+    res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
   }
@@ -117,7 +118,7 @@ export async function listScenarioArtifacts(req: Request, res: Response, next: N
     const { projectId, appId, runId, scenarioId } = req.params;
     const query = RegressionArtifactListQuerySchema.parse(req.query);
     const response = await regressionRunService.listScenarioArtifacts(projectId, appId, runId, scenarioId, query);
-    res.status(StatusCodes.OK).json({ artifacts: response });
+    res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
   }
@@ -146,10 +147,10 @@ export async function downloadArtifact(req: Request, res: Response, next: NextFu
 }
 
 function toArtifactFile(file: Express.Multer.File | undefined) {
-  if (!file) throw new BadRequestError("multipart artifact file is required");
+  if (!file) throw new BadRequestError(ARTIFACT_STORAGE_MESSAGES.MULTIPART_FILE_REQUIRED);
   return {
     buffer: file.buffer,
-    originalName: file.originalname || "artifact",
+    originalName: file.originalname || ARTIFACT_STORAGE.DEFAULT_ARTIFACT_NAME,
     contentType: file.mimetype,
     size: file.size,
   };

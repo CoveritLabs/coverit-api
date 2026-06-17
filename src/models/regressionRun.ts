@@ -10,6 +10,7 @@ import type {
   ListRegressionRunsResponse as ContractListRegressionRunsResponse,
   ListRegressionScenariosResponse as ContractListRegressionScenariosResponse,
   RegressionArtifact as ContractRegressionArtifact,
+  RegressionArtifactTreeNode as ContractRegressionArtifactTreeNode,
   RegressionEvent as ContractRegressionEvent,
   RegressionRun as ContractRegressionRun,
   RegressionRunSummary as ContractRegressionRunSummary,
@@ -106,6 +107,10 @@ export const RegressionArtifactUploadFieldsSchema = z.object({
 });
 
 export type RegressionEventInput = ZodInfer<typeof RegressionEventSchema>;
+export type RegressionRunStatus = ZodInfer<typeof RegressionRunStatusSchema>;
+export type RegressionScenarioStatus = ZodInfer<typeof RegressionScenarioStatusSchema>;
+export type RegressionArtifactKind = ZodInfer<typeof RegressionArtifactKindSchema>;
+export type RegressionArtifactUploadStatus = ZodInfer<typeof RegressionArtifactUploadStatusSchema>;
 export type RegressionRunListQuery = ZodInfer<typeof RegressionRunListQuerySchema>;
 export type RegressionEventListQuery = ZodInfer<typeof RegressionEventListQuerySchema>;
 export type RegressionArtifactListQuery = ZodInfer<typeof RegressionArtifactListQuerySchema>;
@@ -115,9 +120,76 @@ export type RegressionRunContract = Plain<ContractRegressionRun>;
 export type RegressionScenarioContract = Plain<ContractRegressionScenario>;
 export type RegressionEventContract = Plain<ContractRegressionEvent>;
 export type RegressionArtifactContract = Plain<ContractRegressionArtifact>;
+export type RegressionArtifactTreeNodeContract = Plain<ContractRegressionArtifactTreeNode>;
 export type RegressionRunSummaryContract = Plain<ContractRegressionRunSummary>;
 export type ListRegressionRunsRequest = Plain<ContractListRegressionRunsRequest>;
-export type ListRegressionRunsResponse = Plain<ContractListRegressionRunsResponse>;
-export type ListRegressionScenariosResponse = Plain<ContractListRegressionScenariosResponse>;
-export type ListRegressionEventsResponse = Plain<ContractListRegressionEventsResponse>;
-export type ListRegressionArtifactsResponse = Plain<ContractListRegressionArtifactsResponse>;
+export type ListRegressionRunsContractResponse = Plain<ContractListRegressionRunsResponse>;
+export type ListRegressionScenariosContractResponse = Plain<ContractListRegressionScenariosResponse>;
+export type ListRegressionEventsContractResponse = Plain<ContractListRegressionEventsResponse>;
+export type ListRegressionArtifactsContractResponse = Plain<ContractListRegressionArtifactsResponse>;
+
+export type RegressionRunResponse = Omit<RegressionRunContract, "status"> & {
+  status: RegressionRunStatus;
+  summary?: unknown;
+};
+
+export type RegressionScenarioResponse = Omit<RegressionScenarioContract, "status"> & {
+  status: RegressionScenarioStatus;
+};
+
+export type RegressionEventResponse = Omit<RegressionEventContract, "payload"> & {
+  payload: unknown;
+};
+
+export type RegressionArtifactResponse = Omit<RegressionArtifactContract, "kind" | "data" | "metadata" | "sizeBytes" | "uploadStatus"> & {
+  kind: RegressionArtifactKind;
+  data: unknown;
+  sizeBytes?: number;
+  uploadStatus?: RegressionArtifactUploadStatus;
+  metadata?: unknown;
+};
+
+export type RegressionArtifactTreeNodeResponse = Omit<RegressionArtifactTreeNodeContract, "type" | "artifact" | "children" | "sizeBytes"> & {
+  type: "folder" | "file";
+  artifact?: RegressionArtifactResponse;
+  children?: RegressionArtifactTreeNodeResponse[];
+  sizeBytes?: number;
+};
+
+export type ListRegressionRunsResponse = Omit<ListRegressionRunsContractResponse, "runs"> & {
+  runs: RegressionRunResponse[];
+};
+
+export type ListRegressionScenariosResponse = Omit<ListRegressionScenariosContractResponse, "scenarios"> & {
+  scenarios: RegressionScenarioResponse[];
+};
+
+export type ListRegressionEventsResponse = Omit<ListRegressionEventsContractResponse, "events"> & {
+  events: RegressionEventResponse[];
+};
+
+export type ListRegressionArtifactsResponse = Omit<ListRegressionArtifactsContractResponse, "artifacts" | "artifactTree"> & {
+  artifacts: RegressionArtifactResponse[];
+  artifactTree: RegressionArtifactTreeNodeResponse[];
+};
+
+export type RegressionArtifactUploadResponse = {
+  message: string;
+  artifact: RegressionArtifactResponse;
+};
+
+export type RegressionArtifactDownloadResponse = {
+  content: Buffer;
+  contentType: string;
+  name: string;
+};
+
+export type ExtractedRegressionEvent = {
+  stepId?: string;
+  stepLabel?: string;
+  stepType?: string;
+  status?: string;
+  logLevel?: string;
+  hasFailure: boolean;
+  hasHealing: boolean;
+};

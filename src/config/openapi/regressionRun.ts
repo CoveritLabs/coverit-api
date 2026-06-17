@@ -71,6 +71,22 @@ const ArtifactSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string().optional(),
 });
+const ArtifactTreeChildNodeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  path: z.string(),
+  type: z.enum(["folder", "file"]),
+  artifact: ArtifactSchema.optional(),
+  artifactCount: z.number(),
+  sizeBytes: z.number().optional(),
+});
+const ArtifactTreeNodeSchema = ArtifactTreeChildNodeSchema.extend({
+  children: z.array(ArtifactTreeChildNodeSchema).optional(),
+});
+const ArtifactListResponseSchema = z.object({
+  artifacts: z.array(ArtifactSchema),
+  artifactTree: z.array(ArtifactTreeNodeSchema),
+});
 
 registry.registerComponent("securitySchemes", "coveritApiKey", {
   type: "apiKey",
@@ -154,7 +170,10 @@ registry.registerPath({
     { name: "cursor", in: "query", required: false, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Runs", content: { "application/json": { schema: z.object({ runs: z.array(RunSchema), nextCursor: z.string().optional() }) } } },
+    200: {
+      description: "Runs",
+      content: { "application/json": { schema: z.object({ runs: z.array(RunSchema), nextCursor: z.string().optional() }) } },
+    },
   },
 });
 
@@ -222,7 +241,7 @@ registry.registerPath({
     { name: "uploadStatus", in: "query", required: false, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Artifacts", content: { "application/json": { schema: z.object({ artifacts: z.array(ArtifactSchema) }) } } },
+    200: { description: "Artifacts", content: { "application/json": { schema: ArtifactListResponseSchema } } },
   },
 });
 
@@ -242,7 +261,10 @@ registry.registerPath({
     { name: "cursor", in: "query", required: false, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Events", content: { "application/json": { schema: z.object({ events: z.array(EventSchema), nextCursor: z.string().optional() }) } } },
+    200: {
+      description: "Events",
+      content: { "application/json": { schema: z.object({ events: z.array(EventSchema), nextCursor: z.string().optional() }) } },
+    },
   },
 });
 
@@ -261,7 +283,7 @@ registry.registerPath({
     { name: "uploadStatus", in: "query", required: false, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Artifacts", content: { "application/json": { schema: z.object({ artifacts: z.array(ArtifactSchema) }) } } },
+    200: { description: "Artifacts", content: { "application/json": { schema: ArtifactListResponseSchema } } },
   },
 });
 

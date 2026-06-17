@@ -7,15 +7,37 @@ import { REGRESSION_RUN_MESSAGES } from "@constants/messages";
 import { BadRequestError, NotFoundError, UnauthorizedError } from "@utils/errors";
 import { hashToken } from "@utils/token";
 import { createHash } from "crypto";
-import { env } from "@config/env";
 import { artifactStorage } from "@services/artifactStorage.service";
+import { ARTIFACT_STORAGE } from "@constants/artifactStorage";
+import {
+  buildRegressionArtifactTree,
+  mapRegressionArtifact,
+  mapRegressionEvent,
+  mapRegressionRun,
+  mapRegressionScenario,
+  toDbArtifactKind,
+  toDbRunStatus,
+  toDbScenarioStatus,
+  toDbUploadStatus,
+} from "@mappers/regressionRun.mapper";
+import { buildArtifactStoragePath, parseArtifactMetadata } from "@utils/regressionArtifact";
+import type { MessageResponse } from "@models/common";
 import type { ArtifactStorage } from "@models/artifactStorage";
 import type {
+  ExtractedRegressionEvent,
+  ListRegressionArtifactsResponse,
+  ListRegressionEventsResponse,
+  ListRegressionRunsResponse,
+  RegressionArtifactDownloadResponse,
   RegressionArtifactListQuery,
+  RegressionArtifactResponse,
+  RegressionArtifactUploadResponse,
   RegressionArtifactUploadFields,
   RegressionEventInput,
   RegressionEventListQuery,
+  RegressionRunResponse,
   RegressionRunListQuery,
+  RegressionScenarioResponse,
 } from "@models/regressionRun";
 
 type AppContext = { id: string; projectId: string };
@@ -31,7 +53,11 @@ export async function authenticateApplicationApiKey(apiKey?: string | string[]):
   return { id: app.id, projectId: app.projectId };
 }
 
-export async function ingestEvents(apiKey: string | string[] | undefined, pathRunId: string, body: RegressionEventInput | { events: RegressionEventInput[] }) {
+export async function ingestEvents(
+  apiKey: string | string[] | undefined,
+  pathRunId: string,
+  body: RegressionEventInput | { events: RegressionEventInput[] },
+): Promise<MessageResponse> {
   const app = await authenticateApplicationApiKey(apiKey);
   const events: RegressionEventInput[] = Array.isArray((body as any).events) ? (body as any).events : [body as RegressionEventInput];
 
@@ -42,7 +68,7 @@ export async function ingestEvents(apiKey: string | string[] | undefined, pathRu
   return { message: events.length === 1 ? REGRESSION_RUN_MESSAGES.EVENT_STORED : REGRESSION_RUN_MESSAGES.EVENTS_STORED };
 }
 
-export async function completeRun(apiKey: string | string[] | undefined, pathRunId: string, body: SummaryInput) {
+export async function completeRun(apiKey: string | string[] | undefined, pathRunId: string, body: SummaryInput): Promise<MessageResponse> {
   const app = await authenticateApplicationApiKey(apiKey);
   const summary = body.summary ?? body;
   const applicationId = body.applicationId ?? summary.applicationId;
@@ -74,7 +100,7 @@ export async function completeRun(apiKey: string | string[] | undefined, pathRun
   return { message: REGRESSION_RUN_MESSAGES.RUN_COMPLETED };
 }
 
-export async function listRuns(projectId: string, appId: string, query: RegressionRunListQuery) {
+export async function listRuns(projectId: string, appId: string, query: RegressionRunListQuery): Promise<ListRegressionRunsResponse> {
   await requireApplication(projectId, appId);
   const where: any = { targetApplicationId: appId };
   if (query.versionId) where.versionId = query.versionId;
@@ -89,33 +115,39 @@ export async function listRuns(projectId: string, appId: string, query: Regressi
   const page = rows.slice(0, query.limit);
 
   return {
-    runs: page.map(mapRun),
+    runs: page.map(mapRegressionRun),
     nextCursor: rows.length > query.limit ? page[page.length - 1]?.createdAt.toISOString() : undefined,
   };
 }
 
-export async function getRun(projectId: string, appId: string, runId: string) {
+export async function getRun(projectId: string, appId: string, runId: string): Promise<RegressionRunResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
-  return mapRun(run);
+  return mapRegressionRun(run);
 }
 
-export async function listScenarios(projectId: string, appId: string, runId: string) {
+export async function listScenarios(projectId: string, appId: string, runId: string): Promise<RegressionScenarioResponse[]> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const scenarios = await (prisma as any).regressionScenario.findMany({ where: { runDbId: run.id }, orderBy: { createdAt: "asc" } });
-  return scenarios.map(mapScenario);
+  return scenarios.map(mapRegressionScenario);
 }
 
-export async function getScenario(projectId: string, appId: string, runId: string, scenarioId: string) {
+export async function getScenario(projectId: string, appId: string, runId: string, scenarioId: string): Promise<RegressionScenarioResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const scenario = await (prisma as any).regressionScenario.findFirst({ where: { id: scenarioId, runDbId: run.id } });
   if (!scenario) throw new NotFoundError(REGRESSION_RUN_MESSAGES.SCENARIO_NOT_FOUND);
-  return mapScenario(scenario);
+  return mapRegressionScenario(scenario);
 }
 
-export async function listScenarioEvents(projectId: string, appId: string, runId: string, scenarioId: string, query: RegressionEventListQuery) {
+export async function listScenarioEvents(
+  projectId: string,
+  appId: string,
+  runId: string,
+  scenarioId: string,
+  query: RegressionEventListQuery,
+): Promise<ListRegressionEventsResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const scenario = await (prisma as any).regressionScenario.findFirst({ where: { id: scenarioId, runDbId: run.id } });
@@ -127,7 +159,7 @@ export async function listScenarioEvents(projectId: string, appId: string, runId
   const rows = await (prisma as any).regressionEvent.findMany({ where, orderBy: { timestamp: "asc" }, take: query.limit + 1 });
   const page = rows.slice(0, query.limit);
   return {
-    events: page.map(mapEvent),
+    events: page.map(mapRegressionEvent),
     nextCursor: rows.length > query.limit ? page[page.length - 1]?.timestamp.toISOString() : undefined,
   };
 }
@@ -138,7 +170,7 @@ export async function uploadArtifact(
   fields: RegressionArtifactUploadFields,
   file: ArtifactFileInput,
   storage: ArtifactStorage = artifactStorage,
-) {
+): Promise<RegressionArtifactUploadResponse> {
   if (!file?.buffer?.length) throw new BadRequestError(REGRESSION_RUN_MESSAGES.ARTIFACT_FILE_REQUIRED);
 
   const app = await authenticateApplicationApiKey(apiKey);
@@ -147,10 +179,10 @@ export async function uploadArtifact(
 
   const run = await upsertRun(app.id, pathRunId, fields.versionId, {});
   const scenario = await upsertArtifactScenario(run.id, fields);
-  const metadata = parseMetadata(fields.metadata);
+  const metadata = parseArtifactMetadata(fields.metadata);
   const checksumSha256 = createHash("sha256").update(file.buffer).digest("hex");
-  const storagePath = buildStoragePath(app.id, pathRunId, scenario?.scenarioKey, fields.relativePath || file.originalName);
-  const contentType = fields.contentType || file.contentType || "application/octet-stream";
+  const storagePath = buildArtifactStoragePath(app.id, pathRunId, scenario?.scenarioKey, fields.relativePath || file.originalName);
+  const contentType = fields.contentType || file.contentType || ARTIFACT_STORAGE.DEFAULT_CONTENT_TYPE;
 
   try {
     const uploaded = await storage.upload({ path: storagePath, content: file.buffer, contentType });
@@ -171,7 +203,7 @@ export async function uploadArtifact(
         metadata,
       },
     });
-    return { message: REGRESSION_RUN_MESSAGES.ARTIFACT_STORED, artifact: mapArtifact(artifact) };
+    return { message: REGRESSION_RUN_MESSAGES.ARTIFACT_STORED, artifact: mapRegressionArtifact(artifact) };
   } catch (error) {
     const artifact = await (prisma as any).regressionArtifact.create({
       data: {
@@ -182,7 +214,7 @@ export async function uploadArtifact(
         data: {},
         contentType,
         sizeBytes: BigInt(file.size),
-        storageProvider: "dagshub",
+        storageProvider: ARTIFACT_STORAGE.DAGSHUB_FAILED_PROVIDER,
         storagePath,
         checksumSha256,
         uploadStatus: "FAILED",
@@ -190,11 +222,16 @@ export async function uploadArtifact(
         metadata,
       },
     });
-    return { message: REGRESSION_RUN_MESSAGES.ARTIFACT_STORED, artifact: mapArtifact(artifact) };
+    return { message: REGRESSION_RUN_MESSAGES.ARTIFACT_STORED, artifact: mapRegressionArtifact(artifact) };
   }
 }
 
-export async function listArtifacts(projectId: string, appId: string, runId: string, query: RegressionArtifactListQuery = {}) {
+export async function listArtifacts(
+  projectId: string,
+  appId: string,
+  runId: string,
+  query: RegressionArtifactListQuery = {},
+): Promise<ListRegressionArtifactsResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const where: any = { runDbId: run.id };
@@ -202,27 +239,42 @@ export async function listArtifacts(projectId: string, appId: string, runId: str
   if (query.scenarioId) where.scenarioId = query.scenarioId;
   if (query.uploadStatus) where.uploadStatus = toDbUploadStatus(query.uploadStatus);
   const artifacts = await (prisma as any).regressionArtifact.findMany({ where, orderBy: { createdAt: "asc" } });
-  return artifacts.map(mapArtifact);
+  const mappedArtifacts = artifacts.map(mapRegressionArtifact);
+  return {
+    artifacts: mappedArtifacts,
+    artifactTree: buildRegressionArtifactTree(mappedArtifacts),
+  };
 }
 
-export async function listScenarioArtifacts(projectId: string, appId: string, runId: string, scenarioId: string, query: RegressionArtifactListQuery = {}) {
+export async function listScenarioArtifacts(
+  projectId: string,
+  appId: string,
+  runId: string,
+  scenarioId: string,
+  query: RegressionArtifactListQuery = {},
+): Promise<ListRegressionArtifactsResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const scenario = await (prisma as any).regressionScenario.findFirst({ where: { id: scenarioId, runDbId: run.id } });
   if (!scenario) throw new NotFoundError(REGRESSION_RUN_MESSAGES.SCENARIO_NOT_FOUND);
-  const artifacts = await listArtifacts(projectId, appId, runId, { ...query, scenarioId });
-  return artifacts;
+  return listArtifacts(projectId, appId, runId, { ...query, scenarioId });
 }
 
-export async function getArtifact(projectId: string, appId: string, runId: string, artifactId: string) {
+export async function getArtifact(projectId: string, appId: string, runId: string, artifactId: string): Promise<RegressionArtifactResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const artifact = await (prisma as any).regressionArtifact.findFirst({ where: { id: artifactId, runDbId: run.id } });
   if (!artifact) throw new NotFoundError(REGRESSION_RUN_MESSAGES.ARTIFACT_NOT_FOUND);
-  return mapArtifact(artifact);
+  return mapRegressionArtifact(artifact);
 }
 
-export async function downloadArtifact(projectId: string, appId: string, runId: string, artifactId: string, storage: ArtifactStorage = artifactStorage) {
+export async function downloadArtifact(
+  projectId: string,
+  appId: string,
+  runId: string,
+  artifactId: string,
+  storage: ArtifactStorage = artifactStorage,
+): Promise<RegressionArtifactDownloadResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
   const artifact = await (prisma as any).regressionArtifact.findFirst({ where: { id: artifactId, runDbId: run.id } });
@@ -231,12 +283,12 @@ export async function downloadArtifact(projectId: string, appId: string, runId: 
   const stored = await storage.read(artifact.storagePath);
   return {
     content: stored.content,
-    contentType: stored.contentType ?? artifact.contentType ?? "application/octet-stream",
+    contentType: stored.contentType ?? artifact.contentType ?? ARTIFACT_STORAGE.DEFAULT_CONTENT_TYPE,
     name: artifact.name,
   };
 }
 
-async function ingestEvent(app: AppContext, pathRunId: string, event: RegressionEventInput) {
+async function ingestEvent(app: AppContext, pathRunId: string, event: RegressionEventInput): Promise<void> {
   if (event.runId !== pathRunId) throw new BadRequestError(REGRESSION_RUN_MESSAGES.RUN_NOT_FOUND);
   assertApplicationMatch(app, event.applicationId);
   await assertVersion(app.id, event.versionId);
@@ -289,19 +341,19 @@ async function ingestEvent(app: AppContext, pathRunId: string, event: Regression
   }
 }
 
-async function requireApplication(projectId: string, appId: string) {
+async function requireApplication(projectId: string, appId: string): Promise<any> {
   const app = await (prisma as any).targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) throw new NotFoundError(REGRESSION_RUN_MESSAGES.APPLICATION_MISMATCH);
   return app;
 }
 
-async function findRunByPublicId(appId: string, runId: string) {
+async function findRunByPublicId(appId: string, runId: string): Promise<any> {
   const run = await (prisma as any).regressionRun.findUnique({ where: { targetApplicationId_runId: { targetApplicationId: appId, runId } } });
   if (!run) throw new NotFoundError(REGRESSION_RUN_MESSAGES.RUN_NOT_FOUND);
   return run;
 }
 
-async function upsertRun(appId: string, runId: string, versionId: string | undefined, data: Record<string, any>) {
+async function upsertRun(appId: string, runId: string, versionId: string | undefined, data: Record<string, any>): Promise<any> {
   return (prisma as any).regressionRun.upsert({
     where: { targetApplicationId_runId: { targetApplicationId: appId, runId } },
     create: { targetApplicationId: appId, runId, versionId, ...data },
@@ -309,7 +361,7 @@ async function upsertRun(appId: string, runId: string, versionId: string | undef
   });
 }
 
-async function upsertScenario(runDbId: string, event: RegressionEventInput, extracted: ReturnType<typeof extractEvent>) {
+async function upsertScenario(runDbId: string, event: RegressionEventInput, extracted: ExtractedRegressionEvent): Promise<any | undefined> {
   const payload = asRecord(event.payload);
   const scenarioKey = scenarioKeyFor(event, payload);
   if (!scenarioKey) return undefined;
@@ -343,7 +395,7 @@ async function upsertScenario(runDbId: string, event: RegressionEventInput, extr
   });
 }
 
-async function upsertArtifactScenario(runDbId: string, fields: RegressionArtifactUploadFields) {
+async function upsertArtifactScenario(runDbId: string, fields: RegressionArtifactUploadFields): Promise<any | undefined> {
   const scenarioKey = fields.scenarioKey?.trim();
   if (!scenarioKey) return undefined;
   return (prisma as any).regressionScenario.upsert({
@@ -364,18 +416,18 @@ async function upsertArtifactScenario(runDbId: string, fields: RegressionArtifac
   });
 }
 
-async function assertVersion(appId: string, versionId?: string) {
+async function assertVersion(appId: string, versionId?: string): Promise<void> {
   if (!versionId) return;
   const version = await (prisma as any).targetApplicationVersion.findFirst({ where: { id: versionId, targetApplicationId: appId } });
   if (!version) throw new NotFoundError(REGRESSION_RUN_MESSAGES.VERSION_NOT_FOUND);
 }
 
-function assertApplicationMatch(app: AppContext, applicationId?: string) {
+function assertApplicationMatch(app: AppContext, applicationId?: string): void {
   if (!applicationId) throw new BadRequestError(REGRESSION_RUN_MESSAGES.APPLICATION_REQUIRED);
   if (applicationId !== app.id) throw new UnauthorizedError(REGRESSION_RUN_MESSAGES.APPLICATION_MISMATCH);
 }
 
-function extractEvent(event: RegressionEventInput) {
+function extractEvent(event: RegressionEventInput): ExtractedRegressionEvent {
   const payload = asRecord(event.payload);
   const result = asRecord(payload.result);
   const healingInfo = asRecord(result.healingInfo);
@@ -390,7 +442,7 @@ function extractEvent(event: RegressionEventInput) {
   };
 }
 
-function scenarioKeyFor(event: RegressionEventInput, payload: Record<string, any>) {
+function scenarioKeyFor(event: RegressionEventInput, payload: Record<string, any>): string | undefined {
   const feature = event.featureName?.trim();
   const scenario = event.scenarioName?.trim();
   const title = stringValue(payload.title)?.trim();
@@ -401,21 +453,24 @@ function scenarioKeyFor(event: RegressionEventInput, payload: Record<string, any
   return undefined;
 }
 
-async function updateScenarioCounts(scenarioId?: string) {
+async function updateScenarioCounts(scenarioId?: string): Promise<void> {
   if (!scenarioId) return;
   const events = await (prisma as any).regressionEvent.findMany({ where: { scenarioId, type: "assertion.result" }, select: { payload: true } });
   const counts = countAssertions(events.map((e: any) => asRecord(e.payload).result));
   await (prisma as any).regressionScenario.update({ where: { id: scenarioId }, data: counts });
 }
 
-async function updateRunCounts(runDbId: string) {
+async function updateRunCounts(runDbId: string): Promise<void> {
   const events = await (prisma as any).regressionEvent.findMany({ where: { runDbId, type: "assertion.result" }, select: { payload: true } });
   const counts = countAssertions(events.map((e: any) => asRecord(e.payload).result));
   const failedCount = counts.failedCount;
-  await (prisma as any).regressionRun.update({ where: { id: runDbId }, data: { ...counts, status: failedCount > 0 ? "FAILED" : "RUNNING" } });
+  const run = await (prisma as any).regressionRun.findUnique({ where: { id: runDbId }, select: { status: true } });
+  const isCompleted = run?.status === "PASSED" || run?.status === "FAILED";
+  const status = failedCount > 0 ? "FAILED" : isCompleted ? run.status : "RUNNING";
+  await (prisma as any).regressionRun.update({ where: { id: runDbId }, data: { ...counts, status } });
 }
 
-function countAssertions(results: unknown[]) {
+function countAssertions(results: unknown[]): { passedCount: number; failedCount: number; warningCount: number } {
   let passedCount = 0;
   let failedCount = 0;
   let warningCount = 0;
@@ -426,87 +481,6 @@ function countAssertions(results: unknown[]) {
     if (result.passed === false && result.severity !== "warning") failedCount += 1;
   }
   return { passedCount, failedCount, warningCount };
-}
-
-function mapRun(run: any) {
-  return {
-    id: run.id,
-    runId: run.runId,
-    applicationId: run.targetApplicationId,
-    versionId: run.versionId ?? undefined,
-    status: toPublicStatus(run.status),
-    startedAt: run.startedAt?.toISOString?.() ?? undefined,
-    finishedAt: run.finishedAt?.toISOString?.() ?? undefined,
-    durationMs: run.durationMs ?? undefined,
-    passedCount: run.passedCount,
-    failedCount: run.failedCount,
-    warningCount: run.warningCount,
-    summary: run.summary ?? undefined,
-    createdAt: run.createdAt.toISOString(),
-    updatedAt: run.updatedAt.toISOString(),
-  };
-}
-
-function mapScenario(scenario: any) {
-  return {
-    id: scenario.id,
-    runId: scenario.runDbId,
-    scenarioKey: scenario.scenarioKey,
-    featureName: scenario.featureName ?? undefined,
-    scenarioName: scenario.scenarioName ?? undefined,
-    title: scenario.title ?? undefined,
-    file: scenario.file ?? undefined,
-    line: scenario.line ?? undefined,
-    status: toPublicStatus(scenario.status),
-    startedAt: scenario.startedAt?.toISOString?.() ?? undefined,
-    finishedAt: scenario.finishedAt?.toISOString?.() ?? undefined,
-    durationMs: scenario.durationMs ?? undefined,
-    passedCount: scenario.passedCount,
-    failedCount: scenario.failedCount,
-    warningCount: scenario.warningCount,
-  };
-}
-
-function mapEvent(event: any) {
-  return {
-    id: event.id,
-    runId: event.runDbId,
-    scenarioId: event.scenarioId ?? undefined,
-    type: event.type,
-    timestamp: event.timestamp.toISOString(),
-    featureName: event.featureName ?? undefined,
-    scenarioName: event.scenarioName ?? undefined,
-    stepId: event.stepId ?? undefined,
-    stepLabel: event.stepLabel ?? undefined,
-    stepType: event.stepType ?? undefined,
-    status: event.status ?? undefined,
-    logLevel: event.logLevel ?? undefined,
-    hasFailure: event.hasFailure,
-    hasHealing: event.hasHealing,
-    payload: event.payload,
-  };
-}
-
-function mapArtifact(artifact: any) {
-  return {
-    id: artifact.id,
-    runId: artifact.runDbId,
-    scenarioId: artifact.scenarioId ?? undefined,
-    kind: artifact.kind.toLowerCase(),
-    name: artifact.name,
-    data: artifact.data,
-    contentType: artifact.contentType ?? undefined,
-    sizeBytes: artifact.sizeBytes == null ? undefined : Number(artifact.sizeBytes),
-    storageProvider: artifact.storageProvider ?? undefined,
-    storageUri: artifact.storageUri ?? undefined,
-    storagePath: artifact.storagePath ?? undefined,
-    checksumSha256: artifact.checksumSha256 ?? undefined,
-    uploadStatus: artifact.uploadStatus?.toLowerCase?.() ?? undefined,
-    uploadError: artifact.uploadError ?? undefined,
-    metadata: artifact.metadata ?? undefined,
-    createdAt: artifact.createdAt.toISOString(),
-    updatedAt: artifact.updatedAt?.toISOString?.() ?? undefined,
-  };
 }
 
 function asRecord(value: unknown): Record<string, any> {
@@ -525,58 +499,3 @@ function parseDate(value: unknown): Date | undefined {
   return typeof value === "string" ? new Date(value) : undefined;
 }
 
-function toDbRunStatus(status: string) {
-  return status.toUpperCase() === "PASSED" ? "PASSED" : status.toUpperCase() === "FAILED" ? "FAILED" : "RUNNING";
-}
-
-function toDbScenarioStatus(status: string) {
-  return status.toUpperCase() === "PASSED" ? "PASSED" : status.toUpperCase() === "FAILED" ? "FAILED" : "RUNNING";
-}
-
-function toDbArtifactKind(kind: string) {
-  const normalized = kind.toUpperCase();
-  return ["FAILURE", "LOG", "HEALING", "SUMMARY", "SCREENSHOT", "VIDEO", "TRACE", "EVENTS", "OTHER"].includes(normalized) ? normalized : "OTHER";
-}
-
-function toDbUploadStatus(status: string) {
-  return status.toUpperCase() === "FAILED" ? "FAILED" : "UPLOADED";
-}
-
-function toPublicStatus(status: string) {
-  return status.toLowerCase();
-}
-
-function parseMetadata(metadata?: string) {
-  if (!metadata) return {};
-  try {
-    const parsed = JSON.parse(metadata);
-    return asRecord(parsed);
-  } catch {
-    throw new BadRequestError("artifact metadata must be valid JSON");
-  }
-}
-
-function buildStoragePath(applicationId: string, runId: string, scenarioKey: string | undefined, relativePath: string) {
-  const safeRelativePath = sanitizeRelativePath(relativePath);
-  const scenarioSegment = scenarioKey ? sanitizePathSegment(scenarioKey) : "run";
-  return [
-    sanitizeRelativePath(env.DAGSHUB_ARTIFACT_PREFIX ?? "coverit-regression-artifacts"),
-    sanitizePathSegment(applicationId),
-    sanitizePathSegment(runId),
-    scenarioSegment,
-    safeRelativePath,
-  ].join("/");
-}
-
-function sanitizeRelativePath(value: string) {
-  const cleaned = value.replace(/\\/g, "/").split("/").filter(Boolean);
-  if (cleaned.length === 0 || cleaned.some((part) => part === "." || part === "..")) {
-    throw new BadRequestError(REGRESSION_RUN_MESSAGES.ARTIFACT_PATH_INVALID);
-  }
-  return cleaned.map(sanitizePathSegment).join("/");
-}
-
-function sanitizePathSegment(value: string) {
-  const sanitized = value.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return sanitized || "artifact";
-}

@@ -5,6 +5,7 @@
 import { env } from "@config/env";
 import { BadRequestError } from "@utils/errors";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { ARTIFACT_STORAGE, ARTIFACT_STORAGE_MESSAGES } from "@constants/artifactStorage";
 import type { ArtifactStorage } from "@models/artifactStorage";
 import type { ArtifactUploadInput, ArtifactUploadResult } from "types/artifactStorage";
 
@@ -24,7 +25,7 @@ export class DagsHubArtifactStorage implements ArtifactStorage {
 
     this.client = new S3Client({
       endpoint: `https://dagshub.com/api/v1/repo-buckets/s3/${owner}`,
-      region: "us-east-1",
+      region: ARTIFACT_STORAGE.DAGSHUB_REGION,
       credentials: {
         accessKeyId: token,
         secretAccessKey: token,
@@ -41,32 +42,32 @@ export class DagsHubArtifactStorage implements ArtifactStorage {
     const s3 = this.getClient();
 
     const bucket = env.DAGSHUB_BUCKET_NAME ?? "";
-    const cleanPath = encodeArtifactPath(input.path);
+    const cleanPath = this.encodeArtifactPath(input.path);
 
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: cleanPath,
       Body: input.content,
-      ContentType: input.contentType ?? "application/octet-stream",
+      ContentType: input.contentType ?? ARTIFACT_STORAGE.DEFAULT_CONTENT_TYPE,
     });
 
     try {
       await s3.send(command);
 
       return {
-        provider: "dagshub-storage",
+        provider: ARTIFACT_STORAGE.DAGSHUB_PROVIDER,
         uri: `s3://${bucket}/${cleanPath}`,
         path: input.path,
       };
     } catch (error) {
-      throw new Error(`DagsHub Storage upload failed: ${(error as Error).message}`);
+      throw new Error(`${ARTIFACT_STORAGE_MESSAGES.DAGSHUB_UPLOAD_FAILED}: ${(error as Error).message}`);
     }
   }
 
   async read(path: string): Promise<{ content: Buffer; contentType?: string }> {
     const s3 = this.getClient();
     const bucket = env.DAGSHUB_BUCKET_NAME ?? "";
-    const cleanPath = encodeArtifactPath(path);
+    const cleanPath = this.encodeArtifactPath(path);
 
     const command = new GetObjectCommand({
       Bucket: bucket,
@@ -88,26 +89,26 @@ export class DagsHubArtifactStorage implements ArtifactStorage {
         contentType: response.ContentType,
       };
     } catch (error) {
-      throw new Error(`DagsHub Storage read failed: ${(error as Error).message}`);
+      throw new Error(`${ARTIFACT_STORAGE_MESSAGES.DAGSHUB_READ_FAILED}: ${(error as Error).message}`);
     }
   }
 
   publicUrl(path: string): string {
     const owner = env.DAGSHUB_OWNER ?? "";
     const bucket = env.DAGSHUB_BUCKET_NAME ?? "";
-    return `https://dagshub.com/api/v1/repo-buckets/s3/${owner}/${bucket}/${encodeArtifactPath(path)}`;
+    return `https://dagshub.com/api/v1/repo-buckets/s3/${owner}/${bucket}/${this.encodeArtifactPath(path)}`;
   }
 
   private assertConfigured(): void {
     if (!env.DAGSHUB_OWNER || !env.DAGSHUB_TOKEN) {
-      throw new BadRequestError("DagsHub artifact storage is not configured");
+      throw new BadRequestError(ARTIFACT_STORAGE_MESSAGES.DAGSHUB_NOT_CONFIGURED);
     }
   }
-}
 
-function encodeArtifactPath(path: string): string {
-  // Strip leading and trailing slashes to keep storage paths clean
-  return path.replace(/^\/+|\/+$/g, "");
+  private encodeArtifactPath(path: string): string {
+    // Strip leading and trailing slashes to keep storage paths clean
+    return path.replace(/^\/+|\/+$/g, "");
+  }
 }
 
 export const artifactStorage: ArtifactStorage = new DagsHubArtifactStorage();
