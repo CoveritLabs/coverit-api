@@ -51,6 +51,7 @@ describe("regressionRun.service", () => {
   test("ingestEvents - stores event and ignores legacy projectId", async () => {
     (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "app1", projectId: "p1" });
     (prisma as any).regressionRun.upsert.mockResolvedValue({ id: "run-db-1" });
+    (prisma as any).regressionRun.findUnique.mockResolvedValue({ status: "RUNNING" });
     (prisma as any).regressionScenario.upsert.mockResolvedValue({ id: "scenario1" });
     (prisma as any).regressionEvent.create.mockResolvedValue({});
     (prisma as any).regressionEvent.findMany.mockResolvedValue([]);
@@ -78,6 +79,31 @@ describe("regressionRun.service", () => {
         type: "scenario.status",
         status: "running",
       }),
+    }));
+  });
+
+  test("ingestEvents - does not downgrade a completed run to running", async () => {
+    (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "app1", projectId: "p1" });
+    (prisma as any).regressionRun.upsert.mockResolvedValue({ id: "run-db-1" });
+    (prisma as any).regressionRun.findUnique.mockResolvedValue({ status: "PASSED" });
+    (prisma as any).regressionScenario.upsert.mockResolvedValue({ id: "scenario1" });
+    (prisma as any).regressionEvent.create.mockResolvedValue({});
+    (prisma as any).regressionEvent.findMany.mockResolvedValue([]);
+    (prisma as any).regressionRun.update.mockResolvedValue({});
+    (prisma as any).regressionScenario.update.mockResolvedValue({});
+
+    await svc.ingestEvents("key", "run-1", {
+      id: "event1",
+      type: "scenario.status",
+      timestamp: "2026-06-13T22:18:27.073Z",
+      runId: "run-1",
+      applicationId: "app1",
+      payload: { status: "passed", title: "Happy path" },
+    } as any);
+
+    expect((prisma as any).regressionRun.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "run-db-1" },
+      data: expect.objectContaining({ status: "PASSED" }),
     }));
   });
 
@@ -243,5 +269,114 @@ describe("regressionRun.service", () => {
     expect((prisma as any).regressionArtifact.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { runDbId: "run-db-1", kind: "VIDEO", scenarioId: "scenario1", uploadStatus: "UPLOADED" },
     }));
+  });
+
+  test("listArtifacts - returns nested artifact tree with folder aggregates", async () => {
+    const createdAt = new Date("2026-06-13T22:18:20.073Z");
+    (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "app1", projectId: "p1" });
+    (prisma as any).regressionRun.findUnique.mockResolvedValue({ id: "run-db-1" });
+    (prisma as any).regressionArtifact.findMany.mockResolvedValue([
+      {
+        id: "artifact-root",
+        runDbId: "run-db-1",
+        scenarioId: null,
+        kind: "SUMMARY",
+        name: "summary.json",
+        data: {},
+        sizeBytes: BigInt(5),
+        metadata: { relativePath: "summary.json" },
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: "artifact-shot",
+        runDbId: "run-db-1",
+        scenarioId: "scenario1",
+        kind: "SCREENSHOT",
+        name: "screenshot.png",
+        data: {},
+        sizeBytes: BigInt(10),
+        metadata: { relativePath: "playwright/scenario_1/screenshot.png" },
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: "artifact-trace",
+        runDbId: "run-db-1",
+        scenarioId: "scenario1",
+        kind: "TRACE",
+        name: "trace.zip",
+        data: {},
+        sizeBytes: BigInt(20),
+        metadata: { relativePath: "playwright/scenario_1/trace.zip" },
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ]);
+
+    const res = await svc.listArtifacts("p1", "app1", "run-1", {});
+
+    expect(res.artifacts).toHaveLength(3);
+    expect(res.artifactTree).toEqual([
+      expect.objectContaining({
+        id: "folder:playwright",
+        name: "playwright",
+        type: "folder",
+        artifactCount: 2,
+        sizeBytes: 30,
+        children: [
+          expect.objectContaining({
+            id: "folder:playwright/scenario_1",
+            artifactCount: 2,
+            sizeBytes: 30,
+            children: [
+              expect.objectContaining({ id: "artifact:artifact-shot", type: "file", path: "playwright/scenario_1/screenshot.png" }),
+              expect.objectContaining({ id: "artifact:artifact-trace", type: "file", path: "playwright/scenario_1/trace.zip" }),
+            ],
+          }),
+        ],
+      }),
+      expect.objectContaining({ id: "artifact:artifact-root", type: "file", path: "summary.json" }),
+    ]);
+  });
+
+  test("listScenarioArtifacts - returns scenario-scoped artifact tree", async () => {
+    const createdAt = new Date("2026-06-13T22:18:20.073Z");
+    (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "app1", projectId: "p1" });
+    (prisma as any).regressionRun.findUnique.mockResolvedValue({ id: "run-db-1" });
+    (prisma as any).regressionScenario.findFirst.mockResolvedValue({ id: "scenario1", runDbId: "run-db-1" });
+    (prisma as any).regressionArtifact.findMany.mockResolvedValue([
+      {
+        id: "artifact-shot",
+        runDbId: "run-db-1",
+        scenarioId: "scenario1",
+        kind: "SCREENSHOT",
+        name: "screenshot.png",
+        data: {},
+        sizeBytes: BigInt(10),
+        metadata: { relativePath: "playwright/scenario_1/screenshot.png" },
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ]);
+
+    const res = await svc.listScenarioArtifacts("p1", "app1", "run-1", "scenario1", {});
+
+    expect((prisma as any).regressionArtifact.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { runDbId: "run-db-1", scenarioId: "scenario1" },
+    }));
+    expect(res.artifactTree).toEqual([
+      expect.objectContaining({
+        id: "folder:playwright",
+        artifactCount: 1,
+        children: [
+          expect.objectContaining({
+            id: "folder:playwright/scenario_1",
+            artifactCount: 1,
+            children: [expect.objectContaining({ id: "artifact:artifact-shot" })],
+          }),
+        ],
+      }),
+    ]);
   });
 });
