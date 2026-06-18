@@ -184,6 +184,8 @@ model RegressionRun {
   runId               String              @map("run_id")
   targetApplicationId String              @map("target_application_id") @db.Uuid
   versionId           String?             @map("version_id") @db.Uuid
+  name                String              @default("Run")
+  nameNumber          Int                 @default(1) @map("name_number")
   status              RegressionRunStatus @default(RUNNING)
   startedAt           DateTime?           @map("started_at")
   finishedAt          DateTime?           @map("finished_at")
@@ -202,6 +204,7 @@ model RegressionRun {
   artifacts         RegressionArtifact[]
 
   @@unique([targetApplicationId, runId])
+  @@unique([targetApplicationId, name, nameNumber])
   @@index([targetApplicationId, versionId, createdAt])
   @@map("regression_runs")
 }
