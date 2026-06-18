@@ -8,7 +8,6 @@ import {
   type CrawlConfig as ContractCrawlConfig,
   type CrawlerRunSettings as ContractCrawlerRunSettings,
   type InputDefaultsConfig as ContractInputDefaultsConfig,
-  type CodegenConfig as ContractCodegenConfig,
   type CreateCrawlSessionRequest as ContractCreateCrawlSessionRequest,
   type CrawlSessionData as ContractCrawlSessionData,
   type ApplicationVersionCrawlSessionsResponse as ContractApplicationVersionCrawlSessionsResponse,
@@ -20,12 +19,41 @@ import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
 
-export type CrawlerRunSettings = Plain<ContractCrawlerRunSettings>;
+export type CrawlerRunSettings = Plain<ContractCrawlerRunSettings> & {
+  useSemanticDiversity?: boolean;
+  semanticDiversityThreshold?: number;
+  semanticUncertaintyMargin?: number;
+  semanticMaxBankSize?: number;
+  semanticArtifactDir?: string;
+};
 export type InputDefaultsConfig = Plain<ContractInputDefaultsConfig>;
-export type CrawlConfig = Plain<ContractCrawlConfig>;
-export type CodegenConfig = Plain<ContractCodegenConfig>;
-export type CreateCrawlSessionRequest = Plain<ContractCreateCrawlSessionRequest>;
-export type CrawlSessionData = Plain<ContractCrawlSessionData>;
+export type CrawlConfig = Omit<Plain<ContractCrawlConfig>, "crawlerSettings" | "inputDefaults"> & {
+  maxStates?: number;
+  maxDepth?: number;
+  includeUrlPatterns?: string[];
+  excludeUrlPatterns?: string[];
+  enableSemanticDecisions?: boolean;
+  timeoutSeconds?: number;
+  crawlerSettings?: CrawlerRunSettings;
+  inputDefaults?: InputDefaultsConfig;
+};
+export type CodegenConfig = {
+  codegenBranch: string;
+  prTargetBranch: string;
+  prTitle?: string;
+  prBody?: string;
+  prDraft?: boolean;
+};
+export type CreateCrawlSessionRequest = Plain<ContractCreateCrawlSessionRequest> & {
+  regressionCodebaseId?: string;
+  codegenConfig?: CodegenConfig;
+};
+export type CrawlSessionData = Plain<ContractCrawlSessionData> & {
+  regressionCodebaseId?: string;
+  baseUrlSnapshot?: string;
+  scheduleId?: string;
+  codegenConfig?: CodegenConfig;
+};
 export type ApplicationVersionCrawlSessionsResponse = Plain<ContractApplicationVersionCrawlSessionsResponse>;
 export type CrawlSessionByIDResponse = Plain<ContractCrawlSessionByIDResponse>;
 export type StopCrawlSessionResponse = Plain<ContractStopCrawlSessionResponse>;
@@ -50,6 +78,11 @@ export const CrawlerRunSettingsSchema = z.object({
   clickNonHttpLinks: z.boolean().optional(),
   deferDestructiveActions: z.boolean().optional(),
   destructiveKeywords: z.string().max(5_000).optional(),
+  useSemanticDiversity: z.boolean().optional(),
+  semanticDiversityThreshold: z.number().min(0).max(1).optional(),
+  semanticUncertaintyMargin: z.number().min(0).max(1).optional(),
+  semanticMaxBankSize: z.number().int().min(1).max(1_000_000).optional(),
+  semanticArtifactDir: z.string().min(1).max(2_000).optional(),
 }) satisfies ZodType<CrawlerRunSettings>;
 
 export const InputDefaultsConfigSchema = z.object({

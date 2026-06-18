@@ -61,8 +61,19 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
     crawlerSettings.defer_destructive_actions = settings.deferDestructiveActions;
   }
   if (settings?.destructiveKeywords !== undefined) crawlerSettings.destructive_keywords = settings.destructiveKeywords;
+  if (settings?.useSemanticDiversity !== undefined) crawlerSettings.use_semantic_diversity = settings.useSemanticDiversity;
+  if (settings?.semanticDiversityThreshold !== undefined) crawlerSettings.semantic_diversity_threshold = settings.semanticDiversityThreshold;
+  if (settings?.semanticUncertaintyMargin !== undefined) crawlerSettings.semantic_uncertainty_margin = settings.semanticUncertaintyMargin;
+  if (settings?.semanticMaxBankSize !== undefined) crawlerSettings.semantic_max_bank_size = settings.semanticMaxBankSize;
+  if (settings?.semanticArtifactDir !== undefined) crawlerSettings.semantic_artifact_dir = settings.semanticArtifactDir;
 
   const persisted: Record<string, Prisma.InputJsonValue> = {};
+  if (config.maxStates !== undefined) persisted.maxStates = config.maxStates;
+  if (config.maxDepth !== undefined) persisted.maxDepth = config.maxDepth;
+  if (config.includeUrlPatterns !== undefined) persisted.includeUrlPatterns = config.includeUrlPatterns;
+  if (config.excludeUrlPatterns !== undefined) persisted.excludeUrlPatterns = config.excludeUrlPatterns;
+  if (config.enableSemanticDecisions !== undefined) persisted.enableSemanticDecisions = config.enableSemanticDecisions;
+  if (config.timeoutSeconds !== undefined) persisted.timeoutSeconds = config.timeoutSeconds;
   if (Object.keys(crawlerSettings).length > 0) persisted.crawlerSettings = crawlerSettings;
   if (input) {
     persisted.inputDefaults = {
@@ -72,6 +83,54 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
   }
 
   return persisted;
+};
+
+const readObject = (value: unknown): Record<string, unknown> => {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+};
+
+export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string, unknown>): CrawlConfig => {
+  const persisted = readObject(value);
+  const settings = readObject(persisted.crawlerSettings);
+  const input = readObject(persisted.inputDefaults);
+
+  const crawlerSettings = {
+    headless: settings.headless,
+    timeoutMs: settings.timeout_ms ?? settings.timeoutMs,
+    maxStates: settings.max_states ?? settings.maxStates,
+    maxTransitions: settings.max_transitions ?? settings.maxTransitions,
+    maxElementsPerState: settings.max_elements_per_state ?? settings.maxElementsPerState,
+    maxSelectOptionsPerElement: settings.max_select_options_per_element ?? settings.maxSelectOptionsPerElement,
+    maxActionRepeatsPerUrl: settings.max_action_repeats_per_url ?? settings.maxActionRepeatsPerUrl,
+    actionRetryCount: settings.action_retry_count ?? settings.actionRetryCount,
+    replayRetryCount: settings.replay_retry_count ?? settings.replayRetryCount,
+    popupTimeoutMs: settings.popup_timeout_ms ?? settings.popupTimeoutMs,
+    domQuietMs: settings.dom_quiet_ms ?? settings.domQuietMs,
+    domSettleTimeoutMs: settings.dom_settle_timeout_ms ?? settings.domSettleTimeoutMs,
+    useDomQuiescence: settings.use_dom_quiescence ?? settings.useDomQuiescence,
+    pageLoadState: settings.page_load_state ?? settings.pageLoadState,
+    clickNonHttpLinks: settings.click_non_http_links ?? settings.clickNonHttpLinks,
+    deferDestructiveActions: settings.defer_destructive_actions ?? settings.deferDestructiveActions,
+    destructiveKeywords: settings.destructive_keywords ?? settings.destructiveKeywords,
+    useSemanticDiversity: settings.use_semantic_diversity ?? settings.useSemanticDiversity,
+    semanticDiversityThreshold: settings.semantic_diversity_threshold ?? settings.semanticDiversityThreshold,
+    semanticUncertaintyMargin: settings.semantic_uncertainty_margin ?? settings.semanticUncertaintyMargin,
+    semanticMaxBankSize: settings.semantic_max_bank_size ?? settings.semanticMaxBankSize,
+    semanticArtifactDir: settings.semantic_artifact_dir ?? settings.semanticArtifactDir,
+  };
+
+  return {
+    ...defaults,
+    ...persisted,
+    crawlerSettings,
+    inputDefaults:
+      Object.keys(input).length > 0
+        ? {
+            fieldPatterns: readObject(input.field_patterns ?? input.fieldPatterns) as Record<string, string>,
+            typeFallbacks: readObject(input.type_fallbacks ?? input.typeFallbacks) as Record<string, string>,
+          }
+        : undefined,
+  } as CrawlConfig;
 };
 
 export const toPersistedCodegenConfig = (config?: CodegenConfig | null): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput => {

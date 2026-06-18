@@ -12,6 +12,7 @@ interface FlowStep {
 
 interface SerializedFlow {
   checkpoint: string;
+  checkpoint_url?: string;
   is_clipped: boolean;
   path: FlowStep[];
 }
@@ -19,6 +20,7 @@ interface SerializedFlow {
 export type AllFlowsPayload = Record<string, SerializedFlow[]>;
 
 function resolveCheckpointUrl(flow: SerializedFlow): string {
+  if (flow.checkpoint_url) return flow.checkpoint_url;
   const firstAction = flow.path[1];
   return (firstAction?.transition?.checkpoint_url as string | undefined) ?? "";
 }
@@ -31,6 +33,11 @@ export async function saveAllFlows(
     where: { id: sessionId },
     select: { appVersionId: true },
   });
+
+  await prisma.$transaction([
+    prisma.testFlow.deleteMany({ where: { crawlSessionId: sessionId } }),
+    prisma.testFlowStep.deleteMany({ where: { crawlSessionId: sessionId } }),
+  ]);
 
   const stepsByFingerprint = new Map<string, {
     sourceStateHash: string;
@@ -120,7 +127,7 @@ export async function saveAllFlows(
             checkpointStateHash: flow.checkpoint,
             checkpointUrl: resolveCheckpointUrl(flow),
             isClipped: flow.is_clipped,
-            stepCount: flow.path.length,
+            stepCount: compositionSteps.length,
             compositions: {
               create: compositionSteps,
             },

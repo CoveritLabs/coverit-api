@@ -1,3 +1,8 @@
+# Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+# Proprietary and confidential. Unauthorized use is strictly prohibited.
+# See LICENSE file in the project root for full license information.
+
+
 #!/bin/sh
 
 # Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
@@ -28,6 +33,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export API_DIR="$SCRIPT_DIR"
+export CRAWLER_DIR="$(cd "$SCRIPT_DIR/../coverit-crawler" && pwd)"
 
 CMD="${1:-up}"
 shift 2>/dev/null || true

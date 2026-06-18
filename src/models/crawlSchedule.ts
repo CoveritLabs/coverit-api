@@ -2,26 +2,64 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import {
-  CrawlScheduleType,
-  CrawlScheduleMode,
-  type CreateCrawlScheduleRequest as ContractCreateCrawlScheduleRequest,
-  type UpdateCrawlScheduleRequest as ContractUpdateCrawlScheduleRequest,
-  type CrawlScheduleData as ContractCrawlScheduleData,
-  type CrawlScheduleListResponse as ContractCrawlScheduleListResponse,
-} from "@coveritlabs/contracts";
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
+import { CRAWL_SCHEDULE_VALIDATION } from "@constants/messages/crawlSchedule";
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
-import type { Plain } from "./common";
-import { CodegenConfigSchema, type CodegenConfig, CrawlConfigSchema, type CrawlConfig } from "./crawlSession";
-import { CRAWL_SCHEDULE_VALIDATION } from "@constants/messages/crawlSchedule";
+import { CodegenConfigSchema, CrawlConfigSchema, type CodegenConfig, type CrawlConfig } from "./crawlSession";
 
-export type CreateCrawlScheduleRequest = Plain<ContractCreateCrawlScheduleRequest>;
-export type UpdateCrawlScheduleRequest = Plain<ContractUpdateCrawlScheduleRequest>;
-export type CrawlScheduleData = Plain<ContractCrawlScheduleData>;
-export type CrawlScheduleListResponse = Plain<ContractCrawlScheduleListResponse>;
-export { CrawlScheduleType, CrawlScheduleMode };
+export enum CrawlScheduleType {
+  UNSPECIFIED = "UNSPECIFIED",
+  ONCE = "ONCE",
+  CRON = "CRON",
+}
+
+export enum CrawlScheduleMode {
+  UNSPECIFIED = "UNSPECIFIED",
+  LATEST_VERSION = "LATEST_VERSION",
+  FIXED_VERSION = "FIXED_VERSION",
+}
+
+export type CreateCrawlScheduleRequest = {
+  scheduleType: CrawlScheduleType;
+  mode: CrawlScheduleMode;
+  versionId?: string;
+  cron?: string;
+  timezone?: string;
+  runAt?: string;
+  isActive?: boolean;
+  catchUp?: boolean;
+  crawlConfig?: CrawlConfig;
+  codegenConfig?: CodegenConfig;
+  regressionCodebaseId?: string;
+};
+
+export type UpdateCrawlScheduleRequest = Partial<CreateCrawlScheduleRequest>;
+
+export type CrawlScheduleData = {
+  id: string;
+  targetApplicationId: string;
+  scheduleType: CrawlScheduleType;
+  mode: CrawlScheduleMode;
+  versionId?: string;
+  cron?: string;
+  timezone?: string;
+  runAt?: string;
+  isActive: boolean;
+  catchUp: boolean;
+  crawlConfig?: CrawlConfig;
+  codegenConfig?: CodegenConfig;
+  regressionCodebaseId?: string;
+  nextRunAt?: string;
+  lastRunAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CrawlScheduleListResponse = {
+  schedules: CrawlScheduleData[];
+};
+
 export type CrawlScheduleInput = ZodInfer<typeof CreateCrawlScheduleRequestSchema>;
 export { CodegenConfigSchema, CrawlConfigSchema };
 
@@ -45,16 +83,12 @@ export const CreateCrawlScheduleRequestSchema = baseScheduleSchema
     crawlConfig: CrawlConfigSchema.optional().default(() => ({ ...DEFAULT_CRAWL_CONFIG })),
   })
   .superRefine((value, ctx) => {
-    if (value.scheduleType === CrawlScheduleType.ONCE) {
-      if (!value.runAt) {
-        ctx.addIssue({ code: "custom", message: CRAWL_SCHEDULE_VALIDATION.ONE_TIME_SCHEDULE_RUN_AT_REQUIRED });
-      }
+    if (value.scheduleType === CrawlScheduleType.ONCE && !value.runAt) {
+      ctx.addIssue({ code: "custom", message: CRAWL_SCHEDULE_VALIDATION.ONE_TIME_SCHEDULE_RUN_AT_REQUIRED });
     }
 
-    if (value.scheduleType === CrawlScheduleType.CRON) {
-      if (!value.cron) {
-        ctx.addIssue({ code: "custom", message: CRAWL_SCHEDULE_VALIDATION.CRON_SCHEDULE_CRON_REQUIRED });
-      }
+    if (value.scheduleType === CrawlScheduleType.CRON && !value.cron) {
+      ctx.addIssue({ code: "custom", message: CRAWL_SCHEDULE_VALIDATION.CRON_SCHEDULE_CRON_REQUIRED });
     }
 
     if (value.mode === CrawlScheduleMode.FIXED_VERSION && !value.versionId) {

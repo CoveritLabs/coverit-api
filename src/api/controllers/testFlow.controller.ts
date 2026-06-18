@@ -13,6 +13,7 @@ export const FlowStepSchema = z.object({
 
 export const SerializedFlowSchema = z.object({
   checkpoint: z.string(),
+  checkpoint_url: z.string().optional(),
   is_clipped: z.boolean(),
   path: z.array(FlowStepSchema),
 });
