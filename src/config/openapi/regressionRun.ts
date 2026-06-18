@@ -6,77 +6,24 @@ import { z } from "@utils/zod";
 import { registry } from "./registry";
 import {
   RegressionCompleteBodySchema,
-  RegressionArtifactListQuerySchema,
-  RegressionEventListQuerySchema,
+  RegressionArtifactResponseSchema,
+  RegressionArtifactUploadResponseSchema,
   RegressionEventsIngestBodySchema,
-  RegressionRunListQuerySchema,
+  RegressionRunResponseSchema,
+  RegressionScenarioResponseSchema,
+  ListRegressionEventsResponseSchema,
+  ListRegressionRunsResponseSchema,
+  ListRegressionScenariosResponseSchema,
 } from "@models/regressionRun";
 
 const ErrorResponseSchema = z.object({ message: z.string() });
 const MessageResponseSchema = z.object({ message: z.string() });
-const RunSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  applicationId: z.string(),
-  versionId: z.string().optional(),
-  status: z.string(),
-  startedAt: z.string().optional(),
-  finishedAt: z.string().optional(),
-  durationMs: z.number().optional(),
-  passedCount: z.number(),
-  failedCount: z.number(),
-  warningCount: z.number(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-const ScenarioSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  scenarioKey: z.string(),
-  featureName: z.string().optional(),
-  scenarioName: z.string().optional(),
-  title: z.string().optional(),
-  file: z.string().optional(),
-  line: z.number().optional(),
-  status: z.string(),
-  passedCount: z.number(),
-  failedCount: z.number(),
-  warningCount: z.number(),
-});
-const EventSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  scenarioId: z.string().optional(),
-  type: z.string(),
-  timestamp: z.string(),
-  payload: z.unknown(),
-});
-const ArtifactSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  scenarioId: z.string().optional(),
-  kind: z.string(),
-  name: z.string(),
-  data: z.unknown(),
-  contentType: z.string().optional(),
-  sizeBytes: z.number().optional(),
-  storageProvider: z.string().optional(),
-  storageUri: z.string().optional(),
-  storagePath: z.string().optional(),
-  checksumSha256: z.string().optional(),
-  uploadStatus: z.string().optional(),
-  uploadError: z.string().optional(),
-  metadata: z.unknown().optional(),
-  downloadUrl: z.string().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string().optional(),
-});
 const ArtifactTreeChildNodeSchema = z.object({
   id: z.string(),
   name: z.string(),
   path: z.string(),
   type: z.enum(["folder", "file"]),
-  artifact: ArtifactSchema.optional(),
+  artifact: RegressionArtifactResponseSchema.optional(),
   artifactCount: z.number(),
   sizeBytes: z.number().optional(),
 });
@@ -84,7 +31,7 @@ const ArtifactTreeNodeSchema = ArtifactTreeChildNodeSchema.extend({
   children: z.array(ArtifactTreeChildNodeSchema).optional(),
 });
 const ArtifactListResponseSchema = z.object({
-  artifacts: z.array(ArtifactSchema),
+  artifacts: z.array(RegressionArtifactResponseSchema),
   artifactTree: z.array(ArtifactTreeNodeSchema),
 });
 
@@ -122,6 +69,7 @@ registry.registerPath({
           schema: z.object({
             applicationId: z.string(),
             versionId: z.string().optional(),
+            runName: z.string().optional(),
             scenarioKey: z.string().optional(),
             featureName: z.string().optional(),
             scenarioName: z.string().optional(),
@@ -136,7 +84,7 @@ registry.registerPath({
     },
   },
   responses: {
-    202: { description: "Accepted", content: { "application/json": { schema: z.object({ message: z.string(), artifact: ArtifactSchema }) } } },
+    202: { description: "Accepted", content: { "application/json": { schema: RegressionArtifactUploadResponseSchema } } },
     401: { description: "Unauthorized", content: { "application/json": { schema: ErrorResponseSchema } } },
   },
 });
@@ -172,7 +120,7 @@ registry.registerPath({
   responses: {
     200: {
       description: "Runs",
-      content: { "application/json": { schema: z.object({ runs: z.array(RunSchema), nextCursor: z.string().optional() }) } },
+      content: { "application/json": { schema: ListRegressionRunsResponseSchema } },
     },
   },
 });
@@ -189,7 +137,7 @@ registry.registerPath({
     { name: "runId", in: "path", required: true, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Run", content: { "application/json": { schema: RunSchema } } },
+    200: { description: "Run", content: { "application/json": { schema: RegressionRunResponseSchema } } },
   },
 });
 
@@ -205,7 +153,7 @@ registry.registerPath({
     { name: "runId", in: "path", required: true, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Scenarios", content: { "application/json": { schema: z.object({ scenarios: z.array(ScenarioSchema) }) } } },
+    200: { description: "Scenarios", content: { "application/json": { schema: ListRegressionScenariosResponseSchema } } },
   },
 });
 
@@ -222,7 +170,7 @@ registry.registerPath({
     { name: "scenarioId", in: "path", required: true, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Scenario", content: { "application/json": { schema: ScenarioSchema } } },
+    200: { description: "Scenario", content: { "application/json": { schema: RegressionScenarioResponseSchema } } },
   },
 });
 
@@ -263,7 +211,7 @@ registry.registerPath({
   responses: {
     200: {
       description: "Events",
-      content: { "application/json": { schema: z.object({ events: z.array(EventSchema), nextCursor: z.string().optional() }) } },
+      content: { "application/json": { schema: ListRegressionEventsResponseSchema } },
     },
   },
 });
@@ -300,7 +248,7 @@ registry.registerPath({
     { name: "artifactId", in: "path", required: true, schema: { type: "string" } },
   ],
   responses: {
-    200: { description: "Artifact", content: { "application/json": { schema: ArtifactSchema } } },
+    200: { description: "Artifact", content: { "application/json": { schema: RegressionArtifactResponseSchema } } },
   },
 });
 
@@ -320,7 +268,3 @@ registry.registerPath({
     200: { description: "Artifact file" },
   },
 });
-
-void RegressionRunListQuerySchema;
-void RegressionEventListQuerySchema;
-void RegressionArtifactListQuerySchema;
