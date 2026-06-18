@@ -25,6 +25,9 @@ export function mapRegressionRun(run: any): RegressionRunResponse {
     runId: run.runId,
     applicationId: run.targetApplicationId,
     versionId: run.versionId ?? undefined,
+    name: run.name ?? "Run",
+    nameNumber: run.nameNumber ?? 1,
+    displayName: displayRunName(run.name ?? "Run", run.nameNumber ?? 1),
     status: toPublicStatus<RegressionRunStatus>(run.status),
     startedAt: run.startedAt?.toISOString?.() ?? undefined,
     finishedAt: run.finishedAt?.toISOString?.() ?? undefined,
@@ -36,6 +39,10 @@ export function mapRegressionRun(run: any): RegressionRunResponse {
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   };
+}
+
+function displayRunName(name: string, nameNumber: number): string {
+  return nameNumber <= 1 ? name : `${name} #${nameNumber}`;
 }
 
 export function mapRegressionScenario(scenario: any): RegressionScenarioResponse {

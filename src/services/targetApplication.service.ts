@@ -9,6 +9,7 @@ import { removeCrawlJob } from "@queues/crawl.queue";
 import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
 import { generateApplicationApiKey, hashToken, previewApplicationApiKey } from "@utils/token";
 import { mapTargetApplication } from "@mappers/targetApplication.mapper";
+import { deleteArtifactsForApplications } from "@services/artifactCleanup.service";
 import type {
   CreateTargetApplicationRequest,
   UpdateTargetApplicationRequest,
@@ -75,6 +76,7 @@ export async function deleteTargetApplication(projectId: string, appId: string):
     }),
   );
 
+  await deleteArtifactsForApplications([appId]);
   await prisma.targetApplication.delete({ where: { id: appId } });
   return { message: TARGET_APPLICATION_MESSAGES.DELETE_SUCCESS };
 }

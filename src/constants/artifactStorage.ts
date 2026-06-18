@@ -16,6 +16,8 @@ export const ARTIFACT_STORAGE_MESSAGES = {
   DAGSHUB_NOT_CONFIGURED: "DagsHub artifact storage is not configured",
   DAGSHUB_UPLOAD_FAILED: "DagsHub Storage upload failed",
   DAGSHUB_READ_FAILED: "DagsHub Storage read failed",
+  DAGSHUB_LIST_FAILED: "DagsHub Storage list failed",
+  DAGSHUB_DELETE_FAILED: "DagsHub Storage delete failed",
   METADATA_INVALID: "artifact metadata must be valid JSON",
   MULTIPART_FILE_REQUIRED: "multipart artifact file is required",
 } as const;

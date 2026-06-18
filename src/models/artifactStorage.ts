@@ -6,6 +6,7 @@ import type { ArtifactUploadInput, ArtifactUploadResult } from "types/artifactSt
 
 export interface ArtifactStorage {
   upload(input: ArtifactUploadInput): Promise<ArtifactUploadResult>;
+  deleteApplicationArtifacts(applicationId: string): Promise<void>;
   read(path: string): Promise<{ content: Buffer; contentType?: string }>;
   publicUrl(path: string): string;
 }

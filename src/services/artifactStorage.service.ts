@@ -4,10 +4,11 @@
 
 import { env } from "@config/env";
 import { BadRequestError } from "@utils/errors";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { ARTIFACT_STORAGE, ARTIFACT_STORAGE_MESSAGES } from "@constants/artifactStorage";
 import type { ArtifactStorage } from "@models/artifactStorage";
 import type { ArtifactUploadInput, ArtifactUploadResult } from "types/artifactStorage";
+import { buildApplicationArtifactStoragePrefix } from "@utils/regressionArtifact";
 
 export class DagsHubArtifactStorage implements ArtifactStorage {
   private client: S3Client | null = null;
@@ -64,6 +65,38 @@ export class DagsHubArtifactStorage implements ArtifactStorage {
     }
   }
 
+  async deleteApplicationArtifacts(applicationId: string): Promise<void> {
+    const s3 = this.getClient();
+    const bucket = env.DAGSHUB_BUCKET_NAME ?? "";
+    const prefix = `${this.encodeArtifactPath(buildApplicationArtifactStoragePrefix(applicationId))}/`;
+    let continuationToken: string | undefined;
+
+    do {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      });
+
+      let response;
+      try {
+        response = await s3.send(listCommand);
+      } catch (error) {
+        throw new Error(`${ARTIFACT_STORAGE_MESSAGES.DAGSHUB_LIST_FAILED}: ${(error as Error).message}`);
+      }
+
+      const keys = (response.Contents ?? [])
+        .map((item) => item.Key)
+        .filter((key): key is string => Boolean(key));
+
+      if (keys.length > 0) {
+        await this.deleteKeys(s3, bucket, keys);
+      }
+
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+  }
+
   async read(path: string): Promise<{ content: Buffer; contentType?: string }> {
     const s3 = this.getClient();
     const bucket = env.DAGSHUB_BUCKET_NAME ?? "";
@@ -102,6 +135,21 @@ export class DagsHubArtifactStorage implements ArtifactStorage {
   private assertConfigured(): void {
     if (!env.DAGSHUB_OWNER || !env.DAGSHUB_TOKEN) {
       throw new BadRequestError(ARTIFACT_STORAGE_MESSAGES.DAGSHUB_NOT_CONFIGURED);
+    }
+  }
+
+  private async deleteKeys(s3: S3Client, bucket: string, keys: string[]): Promise<void> {
+    for (const key of keys) {
+      const command = new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      });
+
+      try {
+        await s3.send(command);
+      } catch (error) {
+        throw new Error(`${ARTIFACT_STORAGE_MESSAGES.DAGSHUB_DELETE_FAILED}: ${key}: ${(error as Error).message}`);
+      }
     }
   }
 

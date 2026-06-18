@@ -21,11 +21,17 @@ export function buildArtifactStoragePath(applicationId: string, runId: string, s
   const safeRelativePath = sanitizeRelativeArtifactPath(relativePath);
   const scenarioSegment = scenarioKey ? sanitizeArtifactPathSegment(scenarioKey) : ARTIFACT_STORAGE.RUN_SCENARIO_SEGMENT;
   return [
-    sanitizeRelativeArtifactPath(env.DAGSHUB_ARTIFACT_PREFIX ?? ARTIFACT_STORAGE.DEFAULT_PREFIX),
-    sanitizeArtifactPathSegment(applicationId),
+    buildApplicationArtifactStoragePrefix(applicationId),
     sanitizeArtifactPathSegment(runId),
     scenarioSegment,
     safeRelativePath,
+  ].join("/");
+}
+
+export function buildApplicationArtifactStoragePrefix(applicationId: string): string {
+  return [
+    sanitizeRelativeArtifactPath(env.DAGSHUB_ARTIFACT_PREFIX ?? ARTIFACT_STORAGE.DEFAULT_PREFIX),
+    sanitizeArtifactPathSegment(applicationId),
   ].join("/");
 }
 
