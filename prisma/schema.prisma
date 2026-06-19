@@ -52,6 +52,7 @@ model Project {
 
   members ProjectMember[]
   targetApplications TargetApplication[]
+  integrations ProjectIntegration[]
 
   @@map("projects")
 }
@@ -135,6 +136,34 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@map("project_members")
+}
+
+////////////////
+// Integrations
+////////////////
+
+model ProjectIntegration {
+  id                    String    @id @default(uuid()) @db.Uuid
+  projectId             String    @map("project_id") @db.Uuid
+  provider              String
+  jiraCloudId           String    @map("jira_cloud_id")
+  jiraSiteName          String?   @map("jira_site_name")
+  jiraSiteUrl           String?   @map("jira_site_url")
+  scopes                String[]  @default([])
+  tokenType             String    @map("token_type")
+  encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
+  encryptedRefreshToken String?   @map("encrypted_refresh_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  authorizedByUserId    String?   @map("authorized_by_user_id") @db.Uuid
+  refreshedAt           DateTime? @map("refreshed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider])
+  @@index([provider])
+  @@map("project_integrations")
 }
 
 /////////////////////
