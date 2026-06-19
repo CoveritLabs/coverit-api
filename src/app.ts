@@ -10,6 +10,7 @@ import swaggerUi from "swagger-ui-express";
 import { env } from "@config/env";
 import { swaggerSpec } from "@config/swagger";
 import authRoutes from "@api/routes/auth.routes";
+import oauthRoutes from "@api/routes/oauth.routes";
 import projectRoutes from "@api/routes/project.routes";
 import internalTestFlowRouter from "@api/routes/internalTestFlow.route";
 import regressionIngestRoutes from "@api/routes/regressionIngest.routes";
@@ -49,6 +50,7 @@ app.get("/docs.json", (_req: Request, res: Response) => {
 
 const apiBase = env.API_PREFIX;
 app.use(`${apiBase}/auth`, authRoutes);
+app.use(`${apiBase}/oauth`, oauthRoutes);
 app.use(`${apiBase}/regression`, regressionIngestRoutes);
 app.use(`${apiBase}/projects`, projectRoutes);
 app.use(`${apiBase}/internal`, internalTestFlowRouter);

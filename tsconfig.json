@@ -23,6 +23,8 @@
             "@constants/*": ["constants/*"],
             "@queues/*": ["queues/*"],
             "@workers/*": ["workers/*"],
+            "types/*": ["types/*"],
+            "integrations/*": ["integrations/*"],
         },
         "strict": true,
         "esModuleInterop": true,

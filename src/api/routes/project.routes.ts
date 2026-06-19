@@ -16,6 +16,7 @@ import {
   UpdateMemberRequestSchema,
 } from "@models/project";
 import targetAppRoutes from "@api/routes/targetApplication.routes";
+import integrationsRoutes from "@api/routes/integrations.routes";
 
 const router = Router();
 
@@ -34,6 +35,9 @@ router.delete("/:projectId/members", requireProjectAdmin, validateBody(RemoveMem
 
 // Leave project
 router.post("/:projectId/leave", requireProjectMembership, projectController.leaveProject);
+
+// Project integrations
+router.use("/:projectId/integrations", integrationsRoutes);
 
 // Target applications and related entities
 router.use("/:projectId/target-applications", targetAppRoutes);

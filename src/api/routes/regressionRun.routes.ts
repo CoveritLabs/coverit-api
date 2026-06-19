@@ -8,14 +8,16 @@ import { requireProjectMembership } from "@api/middlewares/requireProjectAccess"
 
 const router = Router({ mergeParams: true });
 
-router.get("/", requireProjectMembership, regressionRunController.listRuns);
-router.get("/:runId", requireProjectMembership, regressionRunController.getRun);
-router.get("/:runId/scenarios", requireProjectMembership, regressionRunController.listScenarios);
-router.get("/:runId/scenarios/:scenarioId", requireProjectMembership, regressionRunController.getScenario);
-router.get("/:runId/scenarios/:scenarioId/events", requireProjectMembership, regressionRunController.listScenarioEvents);
-router.get("/:runId/scenarios/:scenarioId/artifacts", requireProjectMembership, regressionRunController.listScenarioArtifacts);
-router.get("/:runId/artifacts", requireProjectMembership, regressionRunController.listArtifacts);
-router.get("/:runId/artifacts/:artifactId", requireProjectMembership, regressionRunController.getArtifact);
-router.get("/:runId/artifacts/:artifactId/download", requireProjectMembership, regressionRunController.downloadArtifact);
+router.use(requireProjectMembership);
+
+router.get("/", regressionRunController.listRuns);
+router.get("/:runId", regressionRunController.getRun);
+router.get("/:runId/scenarios", regressionRunController.listScenarios);
+router.get("/:runId/scenarios/:scenarioId", regressionRunController.getScenario);
+router.get("/:runId/scenarios/:scenarioId/events", regressionRunController.listScenarioEvents);
+router.get("/:runId/scenarios/:scenarioId/artifacts", regressionRunController.listScenarioArtifacts);
+router.get("/:runId/artifacts", regressionRunController.listArtifacts);
+router.get("/:runId/artifacts/:artifactId", regressionRunController.getArtifact);
+router.get("/:runId/artifacts/:artifactId/download", regressionRunController.downloadArtifact);
 
 export default router;

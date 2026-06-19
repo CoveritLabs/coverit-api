@@ -22,6 +22,8 @@ module.exports = {
         '^@generated/(.*)$': '<rootDir>/src/generated/$1',
         '^@queues/(.*)$': '<rootDir>/src/queues/$1',
         '^@workers/(.*)$': '<rootDir>/src/workers/$1',
+        '^types/(.*)$': '<rootDir>/src/types/$1',
+        '^integrations/(.*)$': '<rootDir>/src/integrations/$1',
     },
     clearMocks: true,
     collectCoverageFrom: [
