@@ -4,64 +4,26 @@
 
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
 import { CRAWL_SCHEDULE_VALIDATION } from "@constants/messages/crawlSchedule";
+import {
+  CrawlScheduleMode,
+  CrawlScheduleType,
+  type CreateCrawlScheduleRequest as ContractCreateCrawlScheduleRequest,
+  type UpdateCrawlScheduleRequest as ContractUpdateCrawlScheduleRequest,
+  type CrawlScheduleData as ContractCrawlScheduleData,
+  type CrawlScheduleListResponse as ContractCrawlScheduleListResponse,
+} from "@coveritlabs/contracts";
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
 import { CodegenConfigSchema, CrawlConfigSchema, type CodegenConfig, type CrawlConfig } from "./crawlSession";
+import type { Plain } from "./common";
 
-export enum CrawlScheduleType {
-  UNSPECIFIED = "UNSPECIFIED",
-  ONCE = "ONCE",
-  CRON = "CRON",
-}
-
-export enum CrawlScheduleMode {
-  UNSPECIFIED = "UNSPECIFIED",
-  LATEST_VERSION = "LATEST_VERSION",
-  FIXED_VERSION = "FIXED_VERSION",
-}
-
-export type CreateCrawlScheduleRequest = {
-  scheduleType: CrawlScheduleType;
-  mode: CrawlScheduleMode;
-  versionId?: string;
-  cron?: string;
-  timezone?: string;
-  runAt?: string;
-  isActive?: boolean;
-  catchUp?: boolean;
-  crawlConfig?: CrawlConfig;
-  codegenConfig?: CodegenConfig;
-  regressionCodebaseId?: string;
-};
-
-export type UpdateCrawlScheduleRequest = Partial<CreateCrawlScheduleRequest>;
-
-export type CrawlScheduleData = {
-  id: string;
-  targetApplicationId: string;
-  scheduleType: CrawlScheduleType;
-  mode: CrawlScheduleMode;
-  versionId?: string;
-  cron?: string;
-  timezone?: string;
-  runAt?: string;
-  isActive: boolean;
-  catchUp: boolean;
-  crawlConfig?: CrawlConfig;
-  codegenConfig?: CodegenConfig;
-  regressionCodebaseId?: string;
-  nextRunAt?: string;
-  lastRunAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CrawlScheduleListResponse = {
-  schedules: CrawlScheduleData[];
-};
+export type CreateCrawlScheduleRequest = Plain<ContractCreateCrawlScheduleRequest>;
+export type UpdateCrawlScheduleRequest = Plain<ContractUpdateCrawlScheduleRequest>;
+export type CrawlScheduleData = Plain<ContractCrawlScheduleData>;
+export type CrawlScheduleListResponse = Plain<ContractCrawlScheduleListResponse>;
 
 export type CrawlScheduleInput = ZodInfer<typeof CreateCrawlScheduleRequestSchema>;
-export { CodegenConfigSchema, CrawlConfigSchema };
+export { CodegenConfigSchema, CrawlConfigSchema, CrawlScheduleMode, CrawlScheduleType };
 
 const baseScheduleSchema = z.object({
   scheduleType: z.enum(CrawlScheduleType),

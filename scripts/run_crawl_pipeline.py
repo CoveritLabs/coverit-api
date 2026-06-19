@@ -90,7 +90,6 @@ def _docker(*args: str) -> str:
 
 def _clean_worker_logs(logs: str) -> str:
     blocked = (
-        "neo4j.notifications",
         "Received notification from DBMS server",
         "CREATE CONSTRAINT state_unique IF NOT EXISTS",
         "CREATE INDEX state_session IF NOT EXISTS",
@@ -113,8 +112,8 @@ def _print_worker_snapshot(session_id: str) -> None:
         logs = "\n".join(local_log.read_text(encoding="utf-8", errors="replace").splitlines()[-80:])
         log_label = "local-worker logs"
     else:
-        logs = _docker("logs", "--tail=35", "crawler-worker")
-        log_label = "crawler-worker logs"
+        logs = ""
+        log_label = f"{local_log} not found"
     logs = _clean_worker_logs(logs)
     print(f"redis queue_score={queue or '<empty>'} job_and_running_exists={job or '<empty>'}")
     print(log_label)

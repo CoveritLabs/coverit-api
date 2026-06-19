@@ -3,21 +3,9 @@
 // See LICENSE file in the project root for full license information.
 
 import prisma from "@lib/prisma";
+import type { Prisma } from "@generated/prisma/client";
+import type { AllFlowsPayload, SerializedFlow } from "@models/testFlow";
 import { logger } from "@services/logger.service";
-
-interface FlowStep {
-  state_hash: string;
-  transition: Record<string, unknown> | null;
-}
-
-interface SerializedFlow {
-  checkpoint: string;
-  checkpoint_url?: string;
-  is_clipped: boolean;
-  path: FlowStep[];
-}
-
-export type AllFlowsPayload = Record<string, SerializedFlow[]>;
 
 function resolveCheckpointUrl(flow: SerializedFlow): string {
   if (flow.checkpoint_url) return flow.checkpoint_url;
@@ -76,7 +64,7 @@ export async function saveAllFlows(
     targetStateHash: s.targetStateHash,
     actionType: s.actionType,
     actionFingerprint: s.actionFingerprint,
-    transition: s.transition as any,
+    transition: s.transition as Prisma.InputJsonValue,
   }));
 
   if (stepsToInsert.length > 0) {

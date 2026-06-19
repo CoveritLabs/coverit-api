@@ -5,7 +5,7 @@
 import { Router } from "express";
 
 import * as rcController from "@api/controllers/regressionCodebase.controller";
-import { requireProjectAdmin, requireProjectMember, requireProjectMembership } from "@api/middlewares/requireProjectAccess";
+import { requireProjectAdmin, requireProjectMembership } from "@api/middlewares/requireProjectAccess";
 import { validateBody } from "@api/middlewares/validate";
 import { CreateRegressionCodebaseRequestSchema, UpdateRegressionCodebaseRequestSchema } from "@models/regressionCodebase";
 
