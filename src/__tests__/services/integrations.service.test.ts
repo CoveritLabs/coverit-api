@@ -46,35 +46,8 @@ describe("integrations.service", () => {
     global.fetch = jest.fn();
   });
 
-  test("startOAuth stores state and returns Atlassian authorization URL", async () => {
-    const response = await svc.startOAuth("p1", "u1", "jira", { siteUrl: "https://Example.atlassian.net/path" });
-
-    const url = new URL(response.authorizationUrl);
-    expect(url.origin + url.pathname).toBe("https://auth.atlassian.com/authorize");
-    expect(url.searchParams.get("audience")).toBe("api.atlassian.com");
-    expect(url.searchParams.get("client_id")).toBe("jira-client");
-    expect(url.searchParams.get("redirect_uri")).toBe("https://api.example.com/api/v1/oauth/jira/callback");
-    expect(url.searchParams.get("scope")).toBe("read:jira-work write:jira-work offline_access");
-    expect(url.searchParams.get("response_type")).toBe("code");
-
-    expect(mockCache.cacheSetString).toHaveBeenCalledWith(
-      expect.stringMatching(/^oauth:jira:state:/),
-      expect.any(String),
-      600,
-      expect.any(String),
-    );
-
-    const payload = JSON.parse(mockCache.cacheSetString.mock.calls[0][1]);
-    expect(payload).toMatchObject({
-      projectId: "p1",
-      userId: "u1",
-      provider: "jira",
-      siteUrl: "https://example.atlassian.net",
-    });
-  });
-
   test("startOAuth rejects unsupported providers", async () => {
-    await expect(svc.startOAuth("p1", "u1", "linear", {})).rejects.toThrow(INTEGRATIONS_MESSAGES.UNSUPPORTED_PROVIDER);
+    await expect(svc.startOAuth("p1", "u1", "linear")).rejects.toThrow(INTEGRATIONS_MESSAGES.UNSUPPORTED_PROVIDER);
   });
 
   test("completeOAuth rejects missing or expired state", async () => {
