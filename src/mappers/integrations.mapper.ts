@@ -5,8 +5,13 @@
 import type { ProjectIntegration } from "@generated/prisma/client";
 import type { IntegrationStatusResponse } from "@models/integrations";
 import type { IntegrationProvider } from "types/integrations";
+import type { UserInfo } from "@models/user";
 
-export function mapIntegrationStatus(integration: ProjectIntegration | null, provider: IntegrationProvider): IntegrationStatusResponse {
+export function mapIntegrationStatus(
+  integration: ProjectIntegration | null,
+  authorizedByUser: UserInfo | null,
+  provider: IntegrationProvider,
+): IntegrationStatusResponse {
   if (!integration) {
     return { connected: false, provider, scopes: [], details: { case: undefined } };
   }
@@ -15,7 +20,7 @@ export function mapIntegrationStatus(integration: ProjectIntegration | null, pro
     connected: true,
     provider,
     scopes: integration.scopes ?? [],
-    authorizedByUserId: integration.authorizedByUserId ?? undefined,
+    authorizedByUser: authorizedByUser!,
     accessTokenExpiresAt: integration.accessTokenExpiresAt?.toISOString(),
     refreshedAt: integration.refreshedAt?.toISOString(),
     createdAt: integration.createdAt?.toISOString(),

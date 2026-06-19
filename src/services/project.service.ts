@@ -39,7 +39,7 @@ async function resolveUserIdsByEmails(emails: string[]): Promise<string[]> {
   });
 }
 
-async function assertProjectExists(projectId: string) {
+export async function assertProjectExists(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) {
     throw new NotFoundError(PROJECT_MESSAGES.NOT_FOUND);

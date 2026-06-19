@@ -17,24 +17,15 @@ import { decryptToken, encryptToken } from "@utils/crypto";
 import { BadRequestError, NotFoundError } from "@utils/errors";
 import { buildAuthorizationUrl, exchangeAuthorizationCode, getAccessTokenExpiry, parseScopes, refreshAccessToken } from "@utils/oauth";
 import { buildRedirectUrl } from "@utils/redirect";
+import { getUser } from "./user.service";
+import { assertProjectExists } from "./project.service";
 
 const TOKEN_REFRESH_SKEW_MS = 60_000;
-
-async function assertProjectExists(projectId: string): Promise<void> {
-  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
-}
 
 function assertProviderConfigured(isConfigured: boolean): void {
   if (!isConfigured) {
     throw new BadRequestError(INTEGRATIONS_MESSAGES.OAUTH_PROVIDER_NOT_CONFIGURED);
   }
-}
-
-function serializeState(state: IntegrationOAuthState): string {
-  return JSON.stringify(state);
 }
 
 function parseState(payload: string, expectedProvider: IntegrationProvider): IntegrationOAuthState {
@@ -61,7 +52,7 @@ export async function startOAuth(projectId: string, userId: string, provider: st
 
   await cacheSetString(
     cacheKeys.oauth.integrationState(config.apiProvider, state),
-    serializeState(payload),
+    JSON.stringify(payload),
     env.OAUTH_STATE_TTL_SECONDS,
     CACHE_LOG_CONTEXTS.INTEGRATIONS_WRITE_OAUTH_STATE,
   );
@@ -133,7 +124,13 @@ export async function getIntegrationStatus(projectId: string, provider: string) 
     where: { projectId_provider: { projectId, provider: config.storedProvider } },
   });
 
-  return mapIntegrationStatus(integration, config.apiProvider);
+  if (!integration) {
+    return mapIntegrationStatus(null, null, config.apiProvider);
+  }
+
+  const authorizedByUser = await getUser(integration?.authorizedByUserId!);
+
+  return mapIntegrationStatus(integration, authorizedByUser, config.apiProvider);
 }
 
 export async function disconnectIntegration(projectId: string, provider: string): Promise<{ message: string }> {
