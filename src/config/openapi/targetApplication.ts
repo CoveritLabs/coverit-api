@@ -20,6 +20,9 @@ const TargetApplicationResponseSchema = z.object({
   name: z.string(),
   baseUrl: z.string().optional(),
   versions: z.array(VersionSchema),
+  apiKeyPreview: z.string().optional(),
+  apiKeyCreatedAt: z.string().optional(),
+  apiKeyRotatedAt: z.string().optional(),
 });
 const RegressionCodebaseResponseSchema = z.object({ id: z.string(), frameworkName: z.string(), repositoryUrl: z.string() });
 
@@ -36,7 +39,7 @@ registry.registerPath({
   parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string" } }],
   request: { body: { content: { "application/json": { schema: CreateTargetApplicationRequestSchema } } } },
   responses: {
-    201: { description: "Created", content: { "application/json": { schema: z.object({ id: z.string() }) } } },
+    201: { description: "Created", content: { "application/json": { schema: z.object({ id: z.string(), apiKey: z.string(), apiKeyPreview: z.string() }) } } },
     400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
     403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
   },
@@ -75,6 +78,23 @@ registry.registerPath({
   ],
   responses: {
     200: { description: "Deleted", content: { "application/json": { schema: MessageResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/projects/{projectId}/target-applications/{appId}/api-key/rotate",
+  tags: ["TargetApplication"],
+  summary: "Rotate target application API key",
+  security: [{ bearerAuth: [] }],
+  parameters: [
+    { name: "projectId", in: "path", required: true, schema: { type: "string" } },
+    { name: "appId", in: "path", required: true, schema: { type: "string" } },
+  ],
+  responses: {
+    200: { description: "Rotated", content: { "application/json": { schema: z.object({ apiKey: z.string(), apiKeyPreview: z.string() }) } } },
     403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
   },

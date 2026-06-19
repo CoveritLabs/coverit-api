@@ -4,9 +4,13 @@
 
 // Unit tests for targetApplication.service
 jest.mock("@lib/prisma", () => require("../mocks/prisma"));
+jest.mock("@services/artifactCleanup.service", () => ({
+  deleteArtifactsForApplications: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import * as svc from "@services/targetApplication.service";
+import * as artifactCleanupService from "@services/artifactCleanup.service";
 import { TARGET_APPLICATION_MESSAGES } from "@constants/messages/targetApplication";
 import { ConflictError, NotFoundError } from "@utils/errors";
 
@@ -51,7 +55,17 @@ describe("targetApplication.service", () => {
     (prisma as any).targetApplication.create.mockResolvedValue({ id: "new-id" });
 
     const res = await svc.createTargetApplication("p1", { name: "app", baseUrl: "http://" } as any);
-    expect(res).toEqual({ id: "new-id" });
+    expect(res).toEqual({ id: "new-id", apiKey: expect.stringMatching(/^cvit_/), apiKeyPreview: expect.stringContaining("...") });
+    expect((prisma as any).targetApplication.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        projectId: "p1",
+        name: "app",
+        baseUrl: "http://",
+        apiKeyHash: expect.any(String),
+        apiKeyPreview: expect.any(String),
+        apiKeyCreatedAt: expect.any(Date),
+      }),
+    });
   });
 
   test("updateTargetApplication - not found", async () => {
@@ -88,6 +102,16 @@ describe("targetApplication.service", () => {
 
     const res = await svc.deleteTargetApplication("p1", "app1");
     expect(res).toEqual({ message: TARGET_APPLICATION_MESSAGES.DELETE_SUCCESS });
+    expect((artifactCleanupService as any).deleteArtifactsForApplications).toHaveBeenCalledWith(["app1"]);
+    expect((prisma as any).targetApplication.delete).toHaveBeenCalledWith({ where: { id: "app1" } });
+  });
+
+  test("deleteTargetApplication - cleanup failure prevents delete", async () => {
+    (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "app1", projectId: "p1" });
+    (artifactCleanupService as any).deleteArtifactsForApplications.mockRejectedValue(new Error("cleanup failed"));
+
+    await expect(svc.deleteTargetApplication("p1", "app1")).rejects.toThrow("cleanup failed");
+    expect((prisma as any).targetApplication.delete).not.toHaveBeenCalled();
   });
 
   test("getTargetApplications - maps result", async () => {
@@ -158,5 +182,23 @@ describe("targetApplication.service", () => {
 
     const res = await svc.deleteTargetApplicationVersion("p1", "a1", "v1");
     expect(res).toEqual({ message: TARGET_APPLICATION_MESSAGES.VERSION_DELETE_SUCCESS });
+  });
+
+  test("rotateTargetApplicationApiKey - success returns show-once key", async () => {
+    (prisma as any).targetApplication.findUnique.mockResolvedValue({ id: "a1", projectId: "p1", apiKeyCreatedAt: null });
+    (prisma as any).targetApplication.update.mockResolvedValue({});
+
+    const res = await svc.rotateTargetApplicationApiKey("p1", "a1");
+
+    expect(res).toEqual({ apiKey: expect.stringMatching(/^cvit_/), apiKeyPreview: expect.stringContaining("...") });
+    expect((prisma as any).targetApplication.update).toHaveBeenCalledWith({
+      where: { id: "a1" },
+      data: expect.objectContaining({
+        apiKeyHash: expect.any(String),
+        apiKeyPreview: expect.any(String),
+        apiKeyCreatedAt: expect.any(Date),
+        apiKeyRotatedAt: expect.any(Date),
+      }),
+    });
   });
 });

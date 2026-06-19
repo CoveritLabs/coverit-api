@@ -4,6 +4,9 @@
 
 // Unit tests for project.service covering main branches
 jest.mock("@lib/prisma", () => require("../mocks/prisma"));
+jest.mock("@services/artifactCleanup.service", () => ({
+  deleteArtifactsForApplications: jest.fn(),
+}));
 jest.mock("@lib/cache", () => ({
   cacheDelByPattern: jest.fn(),
   cacheGetJSON: jest.fn(),
@@ -19,6 +22,7 @@ import prisma from "@lib/prisma";
 import * as cache from "@lib/cache";
 import * as userService from "@services/user.service";
 import * as svc from "@services/project.service";
+import * as artifactCleanupService from "@services/artifactCleanup.service";
 import { PROJECT_MESSAGES } from "@constants/messages/project";
 import { ProjectRole } from "@models/project";
 import { BadRequestError, NotFoundError, ConflictError } from "@utils/errors";
@@ -37,6 +41,10 @@ describe("project.service", () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findMany: jest.fn(),
+    };
+
+    mockPrisma.targetApplication = {
       findMany: jest.fn(),
     };
 
@@ -117,11 +125,22 @@ describe("project.service", () => {
 
   test("deleteProject - success invalidates caches", async () => {
     mockPrisma.project.findUnique.mockResolvedValue({ id: "p1" });
+    mockPrisma.targetApplication.findMany.mockResolvedValue([{ id: "app1" }, { id: "app2" }]);
     mockPrisma.project.delete.mockResolvedValue({});
 
     const res = await svc.deleteProject("p1");
     expect(res).toEqual({ message: PROJECT_MESSAGES.DELETE_SUCCESS });
+    expect((artifactCleanupService as any).deleteArtifactsForApplications).toHaveBeenCalledWith(["app1", "app2"]);
     expect(mockCache.cacheDelByPattern).toHaveBeenCalled();
+  });
+
+  test("deleteProject - cleanup failure prevents delete", async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: "p1" });
+    mockPrisma.targetApplication.findMany.mockResolvedValue([{ id: "app1" }]);
+    (artifactCleanupService as any).deleteArtifactsForApplications.mockRejectedValue(new Error("cleanup failed"));
+
+    await expect(svc.deleteProject("p1")).rejects.toThrow("cleanup failed");
+    expect(mockPrisma.project.delete).not.toHaveBeenCalled();
   });
 
   test("getProjects - returns cached when present", async () => {

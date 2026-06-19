@@ -29,6 +29,13 @@ export const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
   RESET_PASSWORD_EMAIL: process.env.RESET_PASSWORD_EMAIL ?? "Coverit <support@updates.coverit.cyou>",
   RESET_PASSWORD_TEMPLATE_ID: process.env.RESET_PASSWORD_TEMPLATE_ID ?? "",
+
+  // Regression artifacts
+  DAGSHUB_OWNER: process.env.DAGSHUB_OWNER ?? "",
+  DAGSHUB_BUCKET_NAME: process.env.DAGSHUB_BUCKET_NAME ?? "",
+  DAGSHUB_TOKEN: process.env.DAGSHUB_TOKEN ?? "",
+  DAGSHUB_ARTIFACT_PREFIX: process.env.DAGSHUB_ARTIFACT_PREFIX ?? "coverit-regression-artifacts",
+  REGRESSION_ARTIFACT_MAX_BYTES: parseInt(process.env.REGRESSION_ARTIFACT_MAX_BYTES ?? "104857600", 10),
 } as const;
 
 console.info("Loaded environment variables:", {
@@ -53,4 +60,9 @@ console.info("Loaded environment variables:", {
   RESEND_API_KEY: env.RESEND_API_KEY ? "****" : "(not set)",
   RESET_PASSWORD_EMAIL: env.RESET_PASSWORD_EMAIL,
   RESET_PASSWORD_TEMPLATE_ID: env.RESET_PASSWORD_TEMPLATE_ID ? "****" : "(not set)",
+  DAGSHUB_OWNER: env.DAGSHUB_OWNER,
+  DAGSHUB_BUCKET_NAME: env.DAGSHUB_BUCKET_NAME,
+  DAGSHUB_TOKEN: env.DAGSHUB_TOKEN ? "****" : "(not set)",
+  DAGSHUB_ARTIFACT_PREFIX: env.DAGSHUB_ARTIFACT_PREFIX,
+  REGRESSION_ARTIFACT_MAX_BYTES: env.REGRESSION_ARTIFACT_MAX_BYTES,
 });

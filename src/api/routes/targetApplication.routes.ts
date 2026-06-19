@@ -15,6 +15,7 @@ import {
 import crawlSessionRoutes from "@api/routes/crawlSession.routes";
 import crawlScheduleRoutes from "@api/routes/crawlSchedule.routes";
 import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
+import regressionRunRoutes from "@api/routes/regressionRun.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -24,6 +25,7 @@ router.put("/:appId", requireProjectAdmin, validateBody(UpdateTargetApplicationR
 router.delete("/:appId", requireProjectAdmin, targetController.deleteTargetApplication);
 router.get("/", requireProjectMembership, targetController.getTargetApplications);
 router.get("/:appId", requireProjectMembership, targetController.getTargetApplication);
+router.post("/:appId/api-key/rotate", requireProjectAdmin, targetController.rotateApiKey);
 
 // Versions
 router.post("/:appId/versions", requireProjectMember, validateBody(CreateTargetApplicationVersionRequestSchema), targetController.createVersion);
@@ -36,5 +38,8 @@ router.use("/:appId/crawl-schedules", crawlScheduleRoutes);
 
 // Regression codebases
 router.use("/:appId/regression-codebases", regressionCodebaseRoutes);
+
+// Regression runs and artifacts
+router.use("/:appId/runs", regressionRunRoutes);
 
 export default router;

@@ -6,6 +6,7 @@ export * from "./auth";
 export * from "./project";
 export * from "./targetApplication";
 export * from "./regressionCodebase";
+export * from "./regressionRun";
 export * from "./user";
 export * from "./crawlSession";
 export * from "./crawlSchedule";
