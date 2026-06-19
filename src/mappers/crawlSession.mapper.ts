@@ -5,6 +5,13 @@
 import { CrawlStatus as PrismaCrawlStatus, CrawlTriggerType as PrismaCrawlTriggerType, Prisma } from "@generated/prisma/client";
 import { CrawlStatus, CrawlTriggerType, type CrawlConfig, type CodegenConfig } from "@models/crawlSession";
 
+type SemanticCrawlerSettings = {
+  semanticDiversityThreshold?: number;
+  semanticUncertaintyMargin?: number;
+  semanticMaxBankSize?: number;
+  semanticArtifactDir?: string;
+};
+
 export const toDbCrawlStatus = (status: CrawlStatus): PrismaCrawlStatus => {
   const key = CrawlStatus[status] as unknown as keyof typeof PrismaCrawlStatus;
   return PrismaCrawlStatus[key] ?? PrismaCrawlStatus.UNSPECIFIED;
@@ -34,7 +41,7 @@ export const fromDbCrawlTriggerType = <TDbTriggerType extends string>(triggerTyp
 };
 
 export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonValue => {
-  const settings = config.crawlerSettings;
+  const settings = config.crawlerSettings as (NonNullable<CrawlConfig["crawlerSettings"]> & SemanticCrawlerSettings) | undefined;
   const input = config.inputDefaults;
 
   const crawlerSettings: Record<string, Prisma.InputJsonValue> = {};
@@ -130,7 +137,7 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
             typeFallbacks: readObject(input.type_fallbacks ?? input.typeFallbacks) as Record<string, string>,
           }
         : undefined,
-  } as CrawlConfig;
+  } as unknown as CrawlConfig;
 };
 
 export const toPersistedCodegenConfig = (config?: CodegenConfig | null): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput => {
