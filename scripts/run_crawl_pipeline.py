@@ -183,7 +183,7 @@ def main() -> int:
         {
             "triggerType": CRAWL_TRIGGER_MANUAL,
             "crawlConfig": {
-                "maxStates": 5,
+                "maxStates": 30,
                 "maxDepth": 2,
                 "includeUrlPatterns": [],
                 "excludeUrlPatterns": [],
@@ -191,7 +191,7 @@ def main() -> int:
                 "timeoutSeconds": 90,
                 "crawlerSettings": {
                     "headless": True,
-                    "maxStates": 5,
+                    "maxStates": 30,
                     "maxTransitions": 20,
                     "timeoutMs": 20000,
                     "useSemanticDiversity": True,
