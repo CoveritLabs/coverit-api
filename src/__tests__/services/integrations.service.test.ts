@@ -6,10 +6,16 @@ jest.mock("@lib/prisma", () => require("../mocks/prisma"));
 jest.mock("@lib/cache", () => ({
   cacheSetString: jest.fn(),
   cacheGetString: jest.fn(),
+  cacheGetJSON: jest.fn().mockResolvedValue(null),
+  cacheSetJSON: jest.fn(),
   cacheDel: jest.fn(),
   cacheKeys: {
     oauth: {
       integrationState: (provider: string, state: string) => `oauth:${provider}:state:${state}`,
+    },
+    user: {
+      byId: (userId: string) => `user:${userId}`,
+      byEmail: (email: string) => `user:${email}`,
     },
   },
 }));
@@ -36,7 +42,11 @@ const mockCache = cache as any;
 describe("integrations.service", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockCache.cacheGetJSON.mockResolvedValue(null);
     mockPrisma.project = { findUnique: jest.fn().mockResolvedValue({ id: "p1" }) };
+    mockPrisma.user = {
+      findUnique: jest.fn().mockResolvedValue({ id: "u1", email: "user@example.com", name: "User" }),
+    };
     mockPrisma.projectIntegration = {
       findUnique: jest.fn().mockResolvedValue(null),
       upsert: jest.fn(),
@@ -142,6 +152,7 @@ describe("integrations.service", () => {
       provider: "jira",
       scopes: [],
       details: { case: undefined },
+      reportingConfig: { case: undefined },
     });
 
     const expiresAt = new Date("2026-06-19T12:00:00.000Z");
@@ -162,7 +173,8 @@ describe("integrations.service", () => {
     expect(status).toMatchObject({
       connected: true,
       provider: "jira",
-      authorizedByUserId: "u1",
+      authorizedByUser: { id: "u1", email: "user@example.com", name: "User" },
+      reportingConfig: { case: "jiraReportingConfig", value: { enabled: false } },
       details: {
         case: "jira",
         value: {

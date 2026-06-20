@@ -18,6 +18,26 @@ const prisma: Record<string, any> = {
         update: jest.fn(),
         deleteMany: jest.fn(),
     },
+    targetApplication: {
+        findUnique: jest.fn(),
+    },
+    regressionRun: {
+        findUnique: jest.fn(),
+    },
+    regressionScenario: {
+        findFirst: jest.fn(),
+    },
+    regressionArtifact: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+    },
+    scenarioIntegrationReport: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+    },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
     $transaction: jest.fn(),
