@@ -23,6 +23,7 @@ services:
       - CRAWL_ARQ_QUEUE_NAME=${CRAWL_ARQ_QUEUE_NAME:-arq:queue}
       - CRAWL_ARQ_EXPIRES_MS=${CRAWL_ARQ_EXPIRES_MS:-86400000}
       - JWT_SECRET=${JWT_SECRET:-}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-}
       - JWT_ACCESS_EXPIRY=${JWT_ACCESS_EXPIRY:-15m}
       - JWT_REFRESH_EXPIRY_SECONDS=${JWT_REFRESH_EXPIRY_SECONDS:-604800}
       - RESET_TOKEN_TTL_SECONDS=${RESET_TOKEN_TTL_SECONDS:-3600}
@@ -45,6 +46,11 @@ services:
       - DAGSHUB_ARTIFACT_PREFIX=${DAGSHUB_ARTIFACT_PREFIX:-artifacts/}
       - REGRESSION_ARTIFACT_MAX_BYTES=${REGRESSION_ARTIFACT_MAX_BYTES:-104857600}
       - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - ATLASSIAN_CLIENT_ID=${ATLASSIAN_CLIENT_ID:-}
+      - ATLASSIAN_CLIENT_SECRET=${ATLASSIAN_CLIENT_SECRET:-}
+      - ATLASSIAN_CALLBACK_URL=${ATLASSIAN_CALLBACK_URL:-http://localhost:3000/api/v1/oauth/jira/callback}
+      - OAUTH_TOKEN_ENCRYPTION_KEY=${OAUTH_TOKEN_ENCRYPTION_KEY:-}
+      - OAUTH_STATE_TTL_SECONDS=${OAUTH_STATE_TTL_SECONDS:-600}
     restart: unless-stopped
     depends_on:
       db:
@@ -85,6 +91,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  neo4j:
+    image: neo4j:5-community
+    container_name: coverit-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-password} 'RETURN 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
 secrets:
   npm_token:
     environment: GITHUB_TOKEN
@@ -92,3 +115,4 @@ secrets:
 volumes:
   postgres_data:
   redis_data:
+  neo4j_data:

@@ -10,3 +10,5 @@ export * from "./regressionRun";
 export * from "./user";
 export * from "./crawlSession";
 export * from "./crawlSchedule";
+export * from "./integrations";
+export * from "./scenarioReports";

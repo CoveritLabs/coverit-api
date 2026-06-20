@@ -13,6 +13,8 @@ import type {
   RegressionScenarioResponse,
   RegressionScenarioStatus,
 } from "@models/regressionRun";
+import { mapScenarioIntegrationReport } from "@mappers/scenarioReports.mapper";
+import { asRecord, stringValue } from "@utils/object";
 
 export type DbRegressionRunStatus = "RUNNING" | "PASSED" | "FAILED";
 export type DbRegressionScenarioStatus = "RUNNING" | "PASSED" | "FAILED";
@@ -62,6 +64,7 @@ export function mapRegressionScenario(scenario: any): RegressionScenarioResponse
     passedCount: scenario.passedCount,
     failedCount: scenario.failedCount,
     warningCount: scenario.warningCount,
+    integrationReports: scenario.integrationReports?.map(mapScenarioIntegrationReport) ?? undefined,
   };
 }
 
@@ -205,10 +208,3 @@ export function toDbUploadStatus(status: string): DbRegressionArtifactUploadStat
   return status.toUpperCase() === "FAILED" ? "FAILED" : "UPLOADED";
 }
 
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}

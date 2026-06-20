@@ -50,6 +50,9 @@ export const cacheKeys = {
     refreshByHashPattern: (tokenHash: string): string => `refresh:*:${tokenHash}`,
     reset: (hashedToken: string): string => `reset:${hashedToken}`,
   },
+  oauth: {
+    integrationState: (provider: string, state: string): string => `oauth:${provider}:state:${state}`,
+  },
   user: {
     byId: (userId: string): string => `user:id:${userId}`,
     byEmail: (email: string): string => `user:email:${email.toLowerCase()}`,

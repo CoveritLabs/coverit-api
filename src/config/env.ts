@@ -15,6 +15,7 @@ export const env = {
   RESET_TOKEN_TTL_SECONDS: parseInt(process.env.RESET_TOKEN_TTL_SECONDS ?? "900", 10), // 15 min
   CACHE_TTL_SECONDS: parseInt(process.env.CACHE_TTL_SECONDS ?? "60", 10),
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
+  INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN ?? "",
 
   // OAuth
   FRONTEND_URL: process.env.FRONTEND_URL ?? "http://localhost:5173",
@@ -24,6 +25,13 @@ export const env = {
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID ?? "",
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? "",
   GITHUB_CALLBACK_URL: process.env.GITHUB_CALLBACK_URL ?? "http://localhost:3000/api/v1/auth/oauth/github/callback",
+
+  // Project integrations OAuth
+  ATLASSIAN_CLIENT_ID: process.env.ATLASSIAN_CLIENT_ID ?? "",
+  ATLASSIAN_CLIENT_SECRET: process.env.ATLASSIAN_CLIENT_SECRET ?? "",
+  ATLASSIAN_CALLBACK_URL: process.env.ATLASSIAN_CALLBACK_URL ?? "http://localhost:3000/api/v1/oauth/jira/callback",
+  OAUTH_TOKEN_ENCRYPTION_KEY: process.env.OAUTH_TOKEN_ENCRYPTION_KEY ?? "",
+  OAUTH_STATE_TTL_SECONDS: parseInt(process.env.OAUTH_STATE_TTL_SECONDS ?? "600", 10),
 
   // Emails
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
@@ -50,6 +58,7 @@ console.info("Loaded environment variables:", {
   JWT_REFRESH_EXPIRY_SECONDS: env.JWT_REFRESH_EXPIRY_SECONDS,
   RESET_TOKEN_TTL_SECONDS: env.RESET_TOKEN_TTL_SECONDS,
   API_PREFIX: env.API_PREFIX,
+  INTERNAL_SERVICE_TOKEN: env.INTERNAL_SERVICE_TOKEN ? "****" : "(not set)",
   FRONTEND_URL: env.FRONTEND_URL,
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
   GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? "****" : "(not set)",
@@ -57,6 +66,11 @@ console.info("Loaded environment variables:", {
   GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID ? "****" : "(not set)",
   GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET ? "****" : "(not set)",
   GITHUB_CALLBACK_URL: env.GITHUB_CALLBACK_URL,
+  ATLASSIAN_CLIENT_ID: env.ATLASSIAN_CLIENT_ID ? "****" : "(not set)",
+  ATLASSIAN_CLIENT_SECRET: env.ATLASSIAN_CLIENT_SECRET ? "****" : "(not set)",
+  ATLASSIAN_CALLBACK_URL: env.ATLASSIAN_CALLBACK_URL,
+  OAUTH_TOKEN_ENCRYPTION_KEY: env.OAUTH_TOKEN_ENCRYPTION_KEY ? "****" : "(not set)",
+  OAUTH_STATE_TTL_SECONDS: env.OAUTH_STATE_TTL_SECONDS,
   RESEND_API_KEY: env.RESEND_API_KEY ? "****" : "(not set)",
   RESET_PASSWORD_EMAIL: env.RESET_PASSWORD_EMAIL,
   RESET_PASSWORD_TEMPLATE_ID: env.RESET_PASSWORD_TEMPLATE_ID ? "****" : "(not set)",

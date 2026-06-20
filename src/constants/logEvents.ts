@@ -32,6 +32,11 @@ export const CACHE_LOG_CONTEXTS = {
   AUTH_DELETE_USER_REFRESH_TOKENS: "Failed to delete user refresh tokens cache",
   AUTH_WRITE_OAUTH_REFRESH_TOKEN: "Failed to write oauth refresh token cache",
 
+  // Integrations service cache contexts
+  INTEGRATIONS_WRITE_OAUTH_STATE: "Failed to write integration oauth state cache",
+  INTEGRATIONS_READ_OAUTH_STATE: "Failed to read integration oauth state cache",
+  INTEGRATIONS_DELETE_OAUTH_STATE: "Failed to delete integration oauth state cache",
+
   // Project service cache contexts
   PROJECT_INVALIDATE_USER_PROJECTS: "Failed to invalidate user projects cache",
   PROJECT_INVALIDATE_PROJECT: "Failed to invalidate project cache",

@@ -52,6 +52,8 @@ model Project {
 
   members ProjectMember[]
   targetApplications TargetApplication[]
+  integrations ProjectIntegration[]
+  scenarioIntegrationReports ScenarioIntegrationReport[]
 
   @@map("projects")
 }
@@ -122,6 +124,14 @@ enum RegressionArtifactUploadStatus {
   FAILED
 }
 
+enum ScenarioIntegrationReportStatus {
+  PENDING
+  CREATING
+  ATTACHING
+  CREATED
+  FAILED
+}
+
 model ProjectMember {
   id        String   @id @default(uuid()) @db.Uuid
   projectId String   @map("project_id") @db.Uuid
@@ -135,6 +145,35 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@map("project_members")
+}
+
+////////////////
+// Integrations
+////////////////
+
+model ProjectIntegration {
+  id                    String    @id @default(uuid()) @db.Uuid
+  projectId             String    @map("project_id") @db.Uuid
+  provider              String
+  jiraCloudId           String    @map("jira_cloud_id")
+  jiraSiteName          String?   @map("jira_site_name")
+  jiraSiteUrl           String?   @map("jira_site_url")
+  scopes                String[]  @default([])
+  tokenType             String    @map("token_type")
+  encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
+  encryptedRefreshToken String?   @map("encrypted_refresh_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  authorizedByUserId    String    @map("authorized_by_user_id") @db.Uuid
+  reportingConfig       Json?     @map("reporting_config")
+  refreshedAt           DateTime? @map("refreshed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider])
+  @@index([provider])
+  @@map("project_integrations")
 }
 
 /////////////////////
@@ -202,6 +241,7 @@ model RegressionRun {
   scenarios         RegressionScenario[]
   events            RegressionEvent[]
   artifacts         RegressionArtifact[]
+  integrationReports ScenarioIntegrationReport[]
 
   @@unique([targetApplicationId, runId])
   @@unique([targetApplicationId, name, nameNumber])
@@ -231,6 +271,7 @@ model RegressionScenario {
   run       RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
   events    RegressionEvent[]
   artifacts RegressionArtifact[]
+  integrationReports ScenarioIntegrationReport[]
 
   @@unique([runDbId, scenarioKey])
   @@index([runDbId, status])
@@ -291,6 +332,39 @@ model RegressionArtifact {
   @@index([scenarioId])
   @@index([runDbId, uploadStatus])
   @@map("regression_artifacts")
+}
+
+model ScenarioIntegrationReport {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  projectId           String                          @map("project_id") @db.Uuid
+  runDbId             String                          @map("run_db_id") @db.Uuid
+  scenarioId          String                          @map("scenario_id") @db.Uuid
+  provider            String
+  status              ScenarioIntegrationReportStatus @default(PENDING)
+  title               String
+  description         String                          @db.Text
+  reporterUserId      String                          @map("reporter_user_id") @db.Uuid
+  reporterEmail       String                          @map("reporter_email")
+  artifactIds         String[]                        @default([]) @map("artifact_ids")
+  attachedArtifactIds String[]                        @default([]) @map("attached_artifact_ids")
+  externalIssueKey    String?                         @map("external_issue_key")
+  externalIssueUrl    String?                         @map("external_issue_url")
+  providerData        Json?                           @map("provider_data")
+  attemptCount        Int                             @default(0) @map("attempt_count")
+  lastAttemptAt       DateTime?                       @map("last_attempt_at")
+  lastError           String?                         @map("last_error") @db.Text
+  createdAt           DateTime                        @default(now()) @map("created_at")
+  updatedAt           DateTime                        @updatedAt @map("updated_at")
+
+  project  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run      RegressionRun      @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, provider])
+  @@index([projectId, provider, status])
+  @@index([runDbId])
+  @@index([status, updatedAt])
+  @@map("scenario_integration_reports")
 }
 
 //////////////////////

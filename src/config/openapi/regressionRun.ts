@@ -15,6 +15,13 @@ import {
   ListRegressionRunsResponseSchema,
   ListRegressionScenariosResponseSchema,
 } from "@models/regressionRun";
+import {
+  CreateScenarioIntegrationReportBodySchema,
+  CreateScenarioIntegrationReportResponseSchema,
+  InternalClaimScenarioReportBodySchema,
+  InternalPatchScenarioReportBodySchema,
+  InternalScenarioReportContextResponseSchema,
+} from "@models/scenarioReports";
 
 const ErrorResponseSchema = z.object({ message: z.string() });
 const MessageResponseSchema = z.object({ message: z.string() });
@@ -175,6 +182,28 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "post",
+  path: "/projects/{projectId}/target-applications/{appId}/runs/{runId}/scenarios/{scenarioId}/reports/{provider}",
+  tags: ["RegressionRuns"],
+  summary: "Create scenario integration report",
+  security: [{ bearerAuth: [] }],
+  parameters: [
+    { name: "projectId", in: "path", required: true, schema: { type: "string" } },
+    { name: "appId", in: "path", required: true, schema: { type: "string" } },
+    { name: "runId", in: "path", required: true, schema: { type: "string" } },
+    { name: "scenarioId", in: "path", required: true, schema: { type: "string" } },
+    { name: "provider", in: "path", required: true, schema: { type: "string", enum: ["jira"] } },
+  ],
+  request: { body: { content: { "application/json": { schema: CreateScenarioIntegrationReportBodySchema } } } },
+  responses: {
+    202: { description: "Scenario report queued", content: { "application/json": { schema: CreateScenarioIntegrationReportResponseSchema } } },
+    400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
   method: "get",
   path: "/projects/{projectId}/target-applications/{appId}/runs/{runId}/scenarios/{scenarioId}/artifacts",
   tags: ["RegressionRuns"],
@@ -190,6 +219,53 @@ registry.registerPath({
   ],
   responses: {
     200: { description: "Artifacts", content: { "application/json": { schema: ArtifactListResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/internal/reports/scenario/claim",
+  tags: ["InternalScenarioReports"],
+  summary: "Claim a pending scenario integration report",
+  parameters: [{ name: "x-coverit-internal-token", in: "header", required: true, schema: { type: "string" } }],
+  request: { body: { content: { "application/json": { schema: InternalClaimScenarioReportBodySchema } } } },
+  responses: {
+    200: { description: "Scenario report claimed", content: { "application/json": { schema: CreateScenarioIntegrationReportResponseSchema } } },
+    204: { description: "No claimable scenario report" },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/internal/reports/scenario/{reportId}/context",
+  tags: ["InternalScenarioReports"],
+  summary: "Get scenario integration report context",
+  parameters: [
+    { name: "x-coverit-internal-token", in: "header", required: true, schema: { type: "string" } },
+    { name: "reportId", in: "path", required: true, schema: { type: "string" } },
+  ],
+  responses: {
+    200: { description: "Scenario report context", content: { "application/json": { schema: InternalScenarioReportContextResponseSchema } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/internal/reports/scenario/{reportId}",
+  tags: ["InternalScenarioReports"],
+  summary: "Patch scenario integration report",
+  parameters: [
+    { name: "x-coverit-internal-token", in: "header", required: true, schema: { type: "string" } },
+    { name: "reportId", in: "path", required: true, schema: { type: "string" } },
+  ],
+  request: { body: { content: { "application/json": { schema: InternalPatchScenarioReportBodySchema } } } },
+  responses: {
+    200: { description: "Scenario report updated", content: { "application/json": { schema: CreateScenarioIntegrationReportResponseSchema } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
   },
 });
 

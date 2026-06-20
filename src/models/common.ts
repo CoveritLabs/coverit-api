@@ -18,7 +18,9 @@ export type Plain<T> =
       ? Array<Plain<U>>
       : T extends ReadonlyArray<infer U>
         ? ReadonlyArray<Plain<U>>
-        : T;
+        : T extends object
+          ? { [K in keyof T]: Plain<T[K]> }
+          : T;
 
 /**
  * Recursively converts object keys from snake_case to camelCase.
