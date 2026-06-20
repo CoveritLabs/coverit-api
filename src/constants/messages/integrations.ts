@@ -19,6 +19,8 @@ export const INTEGRATIONS_MESSAGES = {
   OAUTH_MULTIPLE_JIRA_SITES: "Multiple Jira sites were granted; choose a site before connecting",
   OAUTH_SITE_NOT_GRANTED: "Requested Jira site was not granted",
   OAUTH_REFRESH_FAILED: "Failed to refresh Jira access token",
+  JIRA_API_REQUEST_FAILED: "Jira API request failed",
+  JIRA_REPORTING_CONFIG_INVALID: "Jira reporting configuration is invalid",
   TOKEN_ENCRYPTION_NOT_CONFIGURED: "OAuth token encryption key is not configured",
   OAUTH_FAILED: "Integration OAuth failed",
 } as const;

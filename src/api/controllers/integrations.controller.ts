@@ -8,6 +8,7 @@ import { StatusCodes } from "http-status-codes";
 import { env } from "@config/env";
 import { getCurrentUserId } from "@api/middlewares/requireAuth";
 import { INTEGRATIONS_MESSAGES } from "@constants/messages";
+import { UpdateIntegrationReportingConfigBodySchema } from "@models/integrations";
 import * as integrationsService from "@services/integrations.service";
 import { buildRedirectUrl } from "@utils/redirect";
 
@@ -26,6 +27,27 @@ export async function getIntegrationStatus(req: Request, res: Response, next: Ne
   try {
     const { projectId, provider } = req.params;
     const response = await integrationsService.getIntegrationStatus(projectId, provider);
+    res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getReportingOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { projectId, provider } = req.params;
+    const response = await integrationsService.getReportingOptions(projectId, provider);
+    res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateReportingConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { projectId, provider } = req.params;
+    const body = UpdateIntegrationReportingConfigBodySchema.parse(req.body);
+    const response = await integrationsService.updateReportingConfig(projectId, provider, body);
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);

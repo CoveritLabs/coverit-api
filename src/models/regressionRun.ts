@@ -19,6 +19,7 @@ import type {
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
+import { ScenarioIntegrationReportResponseSchema, type ScenarioIntegrationReportResponse } from "./scenarioReports";
 
 export const RegressionRunStatusSchema = z.enum(["running", "passed", "failed"]);
 export const RegressionScenarioStatusSchema = z.enum(["running", "passed", "failed"]);
@@ -139,8 +140,9 @@ export type RegressionRunResponse = Omit<RegressionRunContract, "status"> & {
   displayName: string;
 };
 
-export type RegressionScenarioResponse = Omit<RegressionScenarioContract, "status"> & {
+export type RegressionScenarioResponse = Omit<RegressionScenarioContract, "status" | "integrationReports"> & {
   status: RegressionScenarioStatus;
+  integrationReports?: ScenarioIntegrationReportResponse[];
 };
 
 export type RegressionEventResponse = Omit<RegressionEventContract, "payload"> & {
@@ -236,6 +238,7 @@ export const RegressionScenarioResponseSchema = z.object({
     passedCount: z.number(),
     failedCount: z.number(),
     warningCount: z.number(),
+    integrationReports: z.array(ScenarioIntegrationReportResponseSchema).optional(),
   }) satisfies ZodType<RegressionScenarioResponse>;
 
 export const RegressionEventResponseSchema = z.object({

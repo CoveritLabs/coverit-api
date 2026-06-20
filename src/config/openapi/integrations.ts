@@ -4,32 +4,20 @@
 
 import { z } from "@utils/zod";
 import { registry } from "./registry";
+import {
+  IntegrationReportingConfigResponseSchema,
+  IntegrationReportingOptionsResponseSchema,
+  IntegrationStatusResponseSchema,
+  StartIntegrationOAuthResponseSchema,
+  UpdateIntegrationReportingConfigBodySchema,
+} from "@models/integrations";
 
 const ErrorResponseSchema = z.object({ message: z.string() });
 const MessageResponseSchema = z.object({ message: z.string() });
-const StartIntegrationOAuthResponseSchema = z.object({ authorizationUrl: z.string().url() });
-const IntegrationStatusResponseSchema = z.object({
-  connected: z.boolean(),
-  provider: z.literal("jira"),
-  scopes: z.array(z.string()),
-  authorizedByUserId: z.string().optional(),
-  accessTokenExpiresAt: z.string().optional(),
-  refreshedAt: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  details: z.object({
-    case: z.enum(["jira"]).optional(),
-    value: z
-      .object({
-        cloudId: z.string(),
-        siteName: z.string().optional(),
-        siteUrl: z.string().optional(),
-      })
-      .optional(),
-  }),
-});
 
 registry.register("IntegrationStatusResponse", IntegrationStatusResponseSchema);
+registry.register("IntegrationReportingConfigResponse", IntegrationReportingConfigResponseSchema);
+registry.register("IntegrationReportingOptionsResponse", IntegrationReportingOptionsResponseSchema);
 
 registry.registerPath({
   method: "post",
@@ -43,6 +31,42 @@ registry.registerPath({
   ],
   responses: {
     200: { description: "Integration authorization URL", content: { "application/json": { schema: StartIntegrationOAuthResponseSchema } } },
+    400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/projects/{projectId}/integrations/{provider}/reporting/options",
+  tags: ["Integrations"],
+  summary: "Get integration reporting options",
+  security: [{ bearerAuth: [] }],
+  parameters: [
+    { name: "projectId", in: "path", required: true, schema: { type: "string" } },
+    { name: "provider", in: "path", required: true, schema: { type: "string", enum: ["jira"] } },
+  ],
+  responses: {
+    200: { description: "Integration reporting options", content: { "application/json": { schema: IntegrationReportingOptionsResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "put",
+  path: "/projects/{projectId}/integrations/{provider}/reporting/config",
+  tags: ["Integrations"],
+  summary: "Update integration reporting config",
+  security: [{ bearerAuth: [] }],
+  parameters: [
+    { name: "projectId", in: "path", required: true, schema: { type: "string" } },
+    { name: "provider", in: "path", required: true, schema: { type: "string", enum: ["jira"] } },
+  ],
+  request: { body: { content: { "application/json": { schema: UpdateIntegrationReportingConfigBodySchema } } } },
+  responses: {
+    200: { description: "Integration reporting config", content: { "application/json": { schema: IntegrationReportingConfigResponseSchema } } },
     400: { description: "Validation failed", content: { "application/json": { schema: ErrorResponseSchema } } },
     403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },

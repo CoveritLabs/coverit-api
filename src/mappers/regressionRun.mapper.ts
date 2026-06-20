@@ -13,6 +13,7 @@ import type {
   RegressionScenarioResponse,
   RegressionScenarioStatus,
 } from "@models/regressionRun";
+import { mapScenarioIntegrationReport } from "@mappers/scenarioReports.mapper";
 
 export type DbRegressionRunStatus = "RUNNING" | "PASSED" | "FAILED";
 export type DbRegressionScenarioStatus = "RUNNING" | "PASSED" | "FAILED";
@@ -62,6 +63,7 @@ export function mapRegressionScenario(scenario: any): RegressionScenarioResponse
     passedCount: scenario.passedCount,
     failedCount: scenario.failedCount,
     warningCount: scenario.warningCount,
+    integrationReports: scenario.integrationReports?.map(mapScenarioIntegrationReport) ?? undefined,
   };
 }
 

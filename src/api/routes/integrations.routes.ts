@@ -10,6 +10,8 @@ import { requireProjectAdmin, requireProjectMembership } from "@api/middlewares/
 const router = Router({ mergeParams: true });
 
 router.post("/:provider/oauth", requireProjectAdmin, integrationsController.startOAuth);
+router.get("/:provider/reporting/options", requireProjectMembership, integrationsController.getReportingOptions);
+router.put("/:provider/reporting/config", requireProjectAdmin, integrationsController.updateReportingConfig);
 router.get("/:provider", requireProjectMembership, integrationsController.getIntegrationStatus);
 router.delete("/:provider", requireProjectAdmin, integrationsController.disconnectIntegration);
 

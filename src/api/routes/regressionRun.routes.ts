@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import * as regressionRunController from "@api/controllers/regressionRun.controller";
+import * as scenarioReportsController from "@api/controllers/scenarioReports.controller";
 import { requireProjectMembership } from "@api/middlewares/requireProjectAccess";
 
 const router = Router({ mergeParams: true });
@@ -16,6 +17,7 @@ router.get("/:runId/scenarios", regressionRunController.listScenarios);
 router.get("/:runId/scenarios/:scenarioId", regressionRunController.getScenario);
 router.get("/:runId/scenarios/:scenarioId/events", regressionRunController.listScenarioEvents);
 router.get("/:runId/scenarios/:scenarioId/artifacts", regressionRunController.listScenarioArtifacts);
+router.post("/:runId/scenarios/:scenarioId/reports/:provider", scenarioReportsController.createScenarioReport);
 router.get("/:runId/artifacts", regressionRunController.listArtifacts);
 router.get("/:runId/artifacts/:artifactId", regressionRunController.getArtifact);
 router.get("/:runId/artifacts/:artifactId/download", regressionRunController.downloadArtifact);

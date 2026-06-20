@@ -13,6 +13,7 @@ import authRoutes from "@api/routes/auth.routes";
 import oauthRoutes from "@api/routes/oauth.routes";
 import projectRoutes from "@api/routes/project.routes";
 import internalTestFlowRouter from "@api/routes/internalTestFlow.route";
+import internalScenarioReportsRoutes from "@api/routes/internalScenarioReports.routes";
 import regressionIngestRoutes from "@api/routes/regressionIngest.routes";
 import { errorHandler } from "@api/middlewares/errorHandler";
 import { httpLogger } from "@api/middlewares/logger";
@@ -54,6 +55,7 @@ app.use(`${apiBase}/oauth`, oauthRoutes);
 app.use(`${apiBase}/regression`, regressionIngestRoutes);
 app.use(`${apiBase}/projects`, projectRoutes);
 app.use(`${apiBase}/internal`, internalTestFlowRouter);
+app.use(`${apiBase}/internal`, internalScenarioReportsRoutes);
 
 app.use(errorHandler);
 

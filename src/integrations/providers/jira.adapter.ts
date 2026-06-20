@@ -4,7 +4,16 @@
 
 import { env } from "@config/env";
 import { INTEGRATIONS_MESSAGES } from "@constants/messages";
-import { JIRA_API_PROVIDER, JIRA_STORED_PROVIDER, type IntegrationProviderAdapter } from "types/integrations";
+import {
+  JIRA_API_PROVIDER,
+  JIRA_STORED_PROVIDER,
+  type IntegrationProviderAdapter,
+  type IntegrationReportingConfig,
+  type IntegrationReportingOptions,
+  type JiraAccess,
+  type JiraReportingIssueType,
+  type JiraReportingProject,
+} from "types/integrations";
 import { BadRequestError } from "@utils/errors";
 import { parseScopes } from "@utils/oauth";
 import { normalizeUrlOrigin } from "@utils/url";
@@ -12,6 +21,7 @@ import { normalizeUrlOrigin } from "@utils/url";
 const ATLASSIAN_AUTHORIZE_URL = "https://auth.atlassian.com/authorize";
 const ATLASSIAN_TOKEN_URL = "https://auth.atlassian.com/oauth/token";
 const ATLASSIAN_RESOURCES_URL = "https://api.atlassian.com/oauth/token/accessible-resources";
+const ATLASSIAN_JIRA_API_BASE = "https://api.atlassian.com/ex/jira";
 const JIRA_SCOPES = ["read:jira-work", "write:jira-work", "offline_access"] as const;
 
 interface AtlassianAccessibleResource {
@@ -19,6 +29,15 @@ interface AtlassianAccessibleResource {
   url?: string;
   name?: string;
   scopes?: string[];
+}
+
+interface JiraProjectSearchResponse {
+  values?: Array<{
+    id?: string;
+    key?: string;
+    name?: string;
+    issueTypes?: Array<{ id?: string; name?: string }>;
+  }>;
 }
 
 async function getAccessibleResources(accessToken: string): Promise<AtlassianAccessibleResource[]> {
@@ -34,6 +53,74 @@ async function getAccessibleResources(accessToken: string): Promise<AtlassianAcc
   }
 
   return (await response.json()) as AtlassianAccessibleResource[];
+}
+
+async function jiraApiFetch<T>(access: JiraAccess, path: string): Promise<T> {
+  const response = await fetch(`${ATLASSIAN_JIRA_API_BASE}/${access.cloudId}${path}`, {
+    headers: {
+      Authorization: `${access.tokenType} ${access.accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new BadRequestError(`${INTEGRATIONS_MESSAGES.JIRA_API_REQUEST_FAILED}: ${response.status}`);
+  }
+
+  return await response.json() as T;
+}
+
+async function getJiraReportingOptions(access: JiraAccess): Promise<IntegrationReportingOptions> {
+  const response = await jiraApiFetch<JiraProjectSearchResponse>(
+    access,
+    "/rest/api/3/project/search?expand=issueTypes&maxResults=100",
+  );
+  const projects: JiraReportingProject[] = [];
+  const issueTypeMap = new Map<string, JiraReportingIssueType>();
+
+  for (const project of response.values ?? []) {
+    if (!project.id || !project.key || !project.name) continue;
+    projects.push({ id: project.id, key: project.key, name: project.name });
+
+    for (const issueType of project.issueTypes ?? []) {
+      if (!issueType.id || !issueType.name) continue;
+      issueTypeMap.set(issueType.id, { id: issueType.id, name: issueType.name });
+    }
+  }
+
+  return {
+    case: "jira",
+    value: {
+      projects,
+      issueTypes: [...issueTypeMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    },
+  };
+}
+
+async function normalizeJiraReportingConfig(input: unknown, access: JiraAccess): Promise<IntegrationReportingConfig> {
+  const config = input && typeof input === "object" && !Array.isArray(input) ? input as Record<string, any> : {};
+  const projectInput = config.project && typeof config.project === "object" ? config.project as Record<string, any> : {};
+  const issueTypeInput = config.issueType && typeof config.issueType === "object" ? config.issueType as Record<string, any> : {};
+
+  const options = await getJiraReportingOptions(access);
+  if (options.case !== "jira") {
+    throw new BadRequestError(INTEGRATIONS_MESSAGES.JIRA_REPORTING_CONFIG_INVALID);
+  }
+  const project = options.value.projects.find((candidate) => candidate.id === projectInput.id || candidate.key === projectInput.key);
+  const issueType = options.value.issueTypes.find((candidate) => candidate.id === issueTypeInput.id);
+
+  if (!project || !issueType) {
+    throw new BadRequestError(INTEGRATIONS_MESSAGES.JIRA_REPORTING_CONFIG_INVALID);
+  }
+
+  return {
+    case: "jira",
+    value: {
+      enabled: config.enabled !== false,
+      project,
+      issueType,
+    },
+  };
 }
 
 function selectJiraResource(resources: AtlassianAccessibleResource[], requestedSiteUrl?: string): AtlassianAccessibleResource {
@@ -88,4 +175,6 @@ export const jiraIntegrationProvider: IntegrationProviderAdapter = {
       tokenType: tokenData.token_type ?? "Bearer",
     };
   },
+  getReportingOptions: getJiraReportingOptions,
+  normalizeReportingConfig: normalizeJiraReportingConfig,
 };

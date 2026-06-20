@@ -121,14 +121,21 @@ export async function getRun(projectId: string, appId: string, runId: string): P
 export async function listScenarios(projectId: string, appId: string, runId: string): Promise<RegressionScenarioResponse[]> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
-  const scenarios = await (prisma as any).regressionScenario.findMany({ where: { runDbId: run.id }, orderBy: { createdAt: "asc" } });
+  const scenarios = await (prisma as any).regressionScenario.findMany({
+    where: { runDbId: run.id },
+    orderBy: { createdAt: "asc" },
+    include: { integrationReports: { orderBy: { createdAt: "asc" } } },
+  });
   return scenarios.map(mapRegressionScenario);
 }
 
 export async function getScenario(projectId: string, appId: string, runId: string, scenarioId: string): Promise<RegressionScenarioResponse> {
   await requireApplication(projectId, appId);
   const run = await findRunByPublicId(appId, runId);
-  const scenario = await (prisma as any).regressionScenario.findFirst({ where: { id: scenarioId, runDbId: run.id } });
+  const scenario = await (prisma as any).regressionScenario.findFirst({
+    where: { id: scenarioId, runDbId: run.id },
+    include: { integrationReports: { orderBy: { createdAt: "asc" } } },
+  });
   if (!scenario) throw new NotFoundError(REGRESSION_RUN_MESSAGES.SCENARIO_NOT_FOUND);
   return mapRegressionScenario(scenario);
 }

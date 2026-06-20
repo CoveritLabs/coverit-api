@@ -15,6 +15,7 @@ export const env = {
   RESET_TOKEN_TTL_SECONDS: parseInt(process.env.RESET_TOKEN_TTL_SECONDS ?? "900", 10), // 15 min
   CACHE_TTL_SECONDS: parseInt(process.env.CACHE_TTL_SECONDS ?? "60", 10),
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
+  INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN ?? "",
 
   // OAuth
   FRONTEND_URL: process.env.FRONTEND_URL ?? "http://localhost:5173",
@@ -57,6 +58,7 @@ console.info("Loaded environment variables:", {
   JWT_REFRESH_EXPIRY_SECONDS: env.JWT_REFRESH_EXPIRY_SECONDS,
   RESET_TOKEN_TTL_SECONDS: env.RESET_TOKEN_TTL_SECONDS,
   API_PREFIX: env.API_PREFIX,
+  INTERNAL_SERVICE_TOKEN: env.INTERNAL_SERVICE_TOKEN ? "****" : "(not set)",
   FRONTEND_URL: env.FRONTEND_URL,
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
   GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? "****" : "(not set)",

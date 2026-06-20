@@ -9,8 +9,13 @@ import { CACHE_LOG_CONTEXTS } from "@constants/logEvents";
 import { INTEGRATIONS_MESSAGES } from "@constants/messages";
 import { cacheDel, cacheGetString, cacheKeys, cacheSetString } from "@lib/cache";
 import prisma from "@lib/prisma";
-import { mapIntegrationStatus } from "@mappers/integrations.mapper";
-import type { StartIntegrationOAuthResponse } from "@models/integrations";
+import { mapIntegrationReportingConfig, mapIntegrationStatus } from "@mappers/integrations.mapper";
+import type {
+  IntegrationReportingConfigResponse,
+  IntegrationReportingOptionsResponse,
+  StartIntegrationOAuthResponse,
+  UpdateIntegrationReportingConfigBody,
+} from "@models/integrations";
 import { JIRA_API_PROVIDER, type IntegrationOAuthState, type IntegrationProvider, type JiraAccess } from "types/integrations";
 import { getIntegrationProvider } from "integrations/providers";
 import { decryptToken, encryptToken } from "@utils/crypto";
@@ -131,6 +136,54 @@ export async function getIntegrationStatus(projectId: string, provider: string) 
   const authorizedByUser = await getUser(integration?.authorizedByUserId!);
 
   return mapIntegrationStatus(integration, authorizedByUser, config.apiProvider);
+}
+
+export async function getReportingOptions(projectId: string, provider: string): Promise<IntegrationReportingOptionsResponse> {
+  const config = getIntegrationProvider(provider);
+  if (!config.getReportingOptions) {
+    throw new BadRequestError(INTEGRATIONS_MESSAGES.UNSUPPORTED_PROVIDER);
+  }
+
+  const access = await getValidJiraAccess(projectId);
+  const options = await config.getReportingOptions(access);
+  return { provider: config.apiProvider, options };
+}
+
+export async function updateReportingConfig(
+  projectId: string,
+  provider: string,
+  body: UpdateIntegrationReportingConfigBody,
+): Promise<IntegrationReportingConfigResponse> {
+  const config = getIntegrationProvider(provider);
+  if (!config.normalizeReportingConfig) {
+    throw new BadRequestError(INTEGRATIONS_MESSAGES.UNSUPPORTED_PROVIDER);
+  }
+  if (body.config.case !== config.apiProvider) {
+    throw new BadRequestError(INTEGRATIONS_MESSAGES.UNSUPPORTED_PROVIDER);
+  }
+
+  const access = await getValidJiraAccess(projectId);
+  const normalized = await config.normalizeReportingConfig(body.config.value, access);
+
+  await prisma.projectIntegration.update({
+    where: { projectId_provider: { projectId, provider: config.storedProvider } },
+    data: { reportingConfig: normalized.value as any },
+  });
+
+  return { provider: config.apiProvider, config: normalized };
+}
+
+export async function getReportingConfig(projectId: string, provider: string): Promise<IntegrationReportingConfigResponse> {
+  const config = getIntegrationProvider(provider);
+  const integration = await prisma.projectIntegration.findUnique({
+    where: { projectId_provider: { projectId, provider: config.storedProvider } },
+  });
+  if (!integration) throw new NotFoundError(INTEGRATIONS_MESSAGES.JIRA_NOT_CONNECTED);
+
+  return {
+    provider: config.apiProvider,
+    config: mapIntegrationReportingConfig(config.apiProvider, (integration as any).reportingConfig),
+  };
 }
 
 export async function disconnectIntegration(projectId: string, provider: string): Promise<{ message: string }> {
