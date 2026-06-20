@@ -227,6 +227,7 @@ describe("scenarioReports.service", () => {
       blocks: [
         { key: "description", type: "paragraph", title: "Description", text: "Broken checkout" },
         { key: "reporter", type: "metadata", title: "Reporter", text: "user@example.com" },
+        { key: "source", type: "metadata", title: "Source", text: "Generated automatically by CoverIt" },
       ],
     });
   });

@@ -42,11 +42,11 @@ describe("integrations.controller", () => {
   test("startOAuth returns authorization URL", async () => {
     (integrationsService.startOAuth as jest.Mock).mockResolvedValue({ authorizationUrl: "https://auth.atlassian.com/authorize" });
 
-    const res = await request(app).post("/projects/p1/integrations/jira/oauth").send({ siteUrl: "https://site.atlassian.net" });
+    const res = await request(app).post("/projects/p1/integrations/jira/oauth");
 
     expect(res.status).toBe(200);
     expect(res.body.authorizationUrl).toBe("https://auth.atlassian.com/authorize");
-    expect(integrationsService.startOAuth).toHaveBeenCalledWith("p1", "u1", "jira", { siteUrl: "https://site.atlassian.net" });
+    expect(integrationsService.startOAuth).toHaveBeenCalledWith("p1", "u1", "jira");
   });
 
   test("getIntegrationStatus returns status", async () => {
