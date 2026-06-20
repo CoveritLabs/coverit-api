@@ -21,9 +21,11 @@ SMOKE_PASSWORD = "CoveritSmoke123!"
 SMOKE_NAME = "CoverIt Smoke"
 TARGET_BASE_URL = "https://quotes.toscrape.com/"
 PROJECT_NAME_PREFIX = "crawler-smoke"
+PROJECT_NAME = PROJECT_NAME_PREFIX
 APPLICATION_NAME = "crawler-smoke-app"
 VERSION_NAME_PREFIX = "smoke-version"
-WATCH_SECONDS = 300
+VERSION_NAME = VERSION_NAME_PREFIX
+WATCH_SECONDS = 1000000
 POLL_SECONDS = 5
 CRAWL_TRIGGER_MANUAL = 1
 TERMINAL_STATUSES = {"COMPLETED", "FAILED", "ABORTED", 3, 4, 5}
@@ -145,36 +147,70 @@ def _auth_token() -> str:
     return str(token)
 
 
-def main() -> int:
-    print("waiting for api")
-    _wait_for_api()
+def _get_or_create_project(token: str) -> dict[str, Any]:
+    projects = _json_request("GET", "/projects", token=token)
+    if isinstance(projects, list):
+        for project in projects:
+            if project.get("name") == PROJECT_NAME:
+                return project
 
-    token = _auth_token()
-    project = _json_request(
+    return _json_request(
         "POST",
         "/projects",
         {
-            "name": f"{PROJECT_NAME_PREFIX}-{RUN_ID}",
+            "name": PROJECT_NAME,
             "description": "Crawler integration smoke project",
         },
         token,
     )
-    project_id = project["id"]
 
-    app = _json_request(
+
+def _get_or_create_app(project_id: str, token: str) -> dict[str, Any]:
+    apps = _json_request("GET", f"/projects/{project_id}/target-applications", token=token)
+    if isinstance(apps, list):
+        for app in apps:
+            if app.get("name") == APPLICATION_NAME:
+                return app
+
+    return _json_request(
         "POST",
         f"/projects/{project_id}/target-applications",
         {"name": APPLICATION_NAME, "baseUrl": TARGET_BASE_URL},
         token,
     )
-    app_id = app["id"]
 
-    version = _json_request(
+
+def _get_or_create_version(project_id: str, app: dict[str, Any], token: str) -> dict[str, Any]:
+    for version in app.get("versions") or []:
+        if version.get("version") == VERSION_NAME:
+            return version
+
+    app_id = str(app["id"])
+    fresh_app = _json_request("GET", f"/projects/{project_id}/target-applications/{app_id}", token=token)
+    for version in fresh_app.get("versions") or []:
+        if version.get("version") == VERSION_NAME:
+            return version
+
+    return _json_request(
         "POST",
         f"/projects/{project_id}/target-applications/{app_id}/versions",
-        {"version": f"{VERSION_NAME_PREFIX}-{RUN_ID}"},
+        {"version": VERSION_NAME},
         token,
     )
+
+
+def main() -> int:
+    print("waiting for api")
+    _wait_for_api()
+
+    token = _auth_token()
+    project = _get_or_create_project(token)
+    project_id = project["id"]
+
+    app = _get_or_create_app(project_id, token)
+    app_id = app["id"]
+
+    version = _get_or_create_version(project_id, app, token)
     version_id = version["id"]
 
     session = _json_request(
@@ -184,7 +220,7 @@ def main() -> int:
             "triggerType": CRAWL_TRIGGER_MANUAL,
             "crawlConfig": {
                 "maxStates": 30,
-                "maxDepth": 2,
+                "maxDepth": 10,
                 "includeUrlPatterns": [],
                 "excludeUrlPatterns": [],
                 "enableSemanticDecisions": True,
@@ -194,7 +230,7 @@ def main() -> int:
                     "maxStates": 30,
                     "maxTransitions": 20,
                     "timeoutMs": 20000,
-                    "useSemanticDiversity": True,
+                    "useSemanticDiversity": False,
                 },
             },
         },
@@ -205,6 +241,7 @@ def main() -> int:
     print(f"project_id={project_id}")
     print(f"app_id={app_id}")
     print(f"version_id={version_id}")
+    print(f"run_id={RUN_ID}")
     print(f"session_id={session_id}")
     print(f"crawl_url={TARGET_BASE_URL}")
 
