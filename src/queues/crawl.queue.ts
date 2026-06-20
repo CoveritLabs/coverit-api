@@ -2,13 +2,13 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import { enqueueCrawlSession, markCrawlSessionCancelled } from "@queues/stream/crawlStream";
+import { abortCrawlSession, enqueueCrawlSession } from "@queues/arq/crawlArq";
 
-export async function addCrawlJob(sessionId: string): Promise<void> {
-    await enqueueCrawlSession(sessionId);
+export async function addCrawlJob(sessionId: string): Promise<string> {
+  return enqueueCrawlSession(sessionId);
 }
 
 export async function removeCrawlJob(sessionId: string): Promise<boolean> {
-    await markCrawlSessionCancelled(sessionId);
-    return true;
+  await abortCrawlSession(sessionId);
+  return true;
 }

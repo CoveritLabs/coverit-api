@@ -7,6 +7,7 @@ import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
 import {
   fromDbCrawlStatus,
   fromDbCrawlTriggerType,
+  fromPersistedCrawlConfig,
   toDbCrawlStatusFilter,
   toDbCrawlTriggerType,
   toDbCrawlTriggerTypeFilter,
@@ -38,7 +39,7 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   triggerType: fromDbCrawlTriggerType(session.triggerType),
 
   crawlConfig: (() => {
-    const parsed = CrawlConfigSchema.safeParse(session.config);
+    const parsed = CrawlConfigSchema.safeParse(fromPersistedCrawlConfig(session.config, { ...DEFAULT_CRAWL_CONFIG }));
     return parsed.success ? parsed.data : { ...DEFAULT_CRAWL_CONFIG };
   })(),
 
@@ -218,16 +219,20 @@ export async function startSession(projectId: string, appId: string, versionId: 
   if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
 
   if (session.status === PrismaCrawlStatus.NEW) {
-    await prisma.crawlSession.update({
-      where: { id: sessionId },
-      data: { status: PrismaCrawlStatus.QUEUED },
+    const queued = await prisma.crawlSession.updateMany({
+      where: { id: sessionId, status: PrismaCrawlStatus.NEW },
+      data: { status: PrismaCrawlStatus.QUEUED, finishedAt: null, error: null },
     });
+
+    if (queued.count !== 1) {
+      return { message: CRAWL_SESSION_MESSAGES.ALREADY_STARTED };
+    }
 
     try {
       await addCrawlJob(sessionId);
     } catch (error) {
-      await prisma.crawlSession.update({
-        where: { id: sessionId },
+      await prisma.crawlSession.updateMany({
+        where: { id: sessionId, status: PrismaCrawlStatus.QUEUED },
         data: { status: PrismaCrawlStatus.NEW },
       });
       throw error;
@@ -278,7 +283,12 @@ export async function abortSession(projectId: string, appId: string, versionId: 
     data: { status: PrismaCrawlStatus.ABORTED, finishedAt: new Date() },
   });
 
-  if (session.status === PrismaCrawlStatus.QUEUED || session.status === PrismaCrawlStatus.NEW) {
+  if (
+    session.status === PrismaCrawlStatus.QUEUED ||
+    session.status === PrismaCrawlStatus.NEW ||
+    session.status === PrismaCrawlStatus.RUNNING ||
+    session.status === PrismaCrawlStatus.PAUSED
+  ) {
     await removeCrawlJob(sessionId);
   }
 

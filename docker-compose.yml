@@ -8,7 +8,7 @@ services:
   api:
     image: ghcr.io/coveritlabs/coverit-api:${API_TAG:-dev}
     build:
-      context: ${API_DIR}
+      context: ${API_DIR:-.}
       secrets:
         - npm_token
     pull_policy: always
@@ -18,8 +18,10 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL:-}
-      - REDIS_URL=${REDIS_URL:-}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/coverit}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CRAWL_ARQ_QUEUE_NAME=${CRAWL_ARQ_QUEUE_NAME:-arq:queue}
+      - CRAWL_ARQ_EXPIRES_MS=${CRAWL_ARQ_EXPIRES_MS:-86400000}
       - JWT_SECRET=${JWT_SECRET:-}
       - JWT_ACCESS_EXPIRY=${JWT_ACCESS_EXPIRY:-15m}
       - JWT_REFRESH_EXPIRY_SECONDS=${JWT_REFRESH_EXPIRY_SECONDS:-604800}
@@ -49,11 +51,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
   db:
     image: postgres:18
     container_name: coverit-postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     environment:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}

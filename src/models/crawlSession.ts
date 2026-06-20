@@ -50,6 +50,11 @@ export const CrawlerRunSettingsSchema = z.object({
   clickNonHttpLinks: z.boolean().optional(),
   deferDestructiveActions: z.boolean().optional(),
   destructiveKeywords: z.string().max(5_000).optional(),
+  useSemanticDiversity: z.boolean().optional(),
+  semanticDiversityThreshold: z.number().min(0).max(1).optional(),
+  semanticUncertaintyMargin: z.number().min(0).max(1).optional(),
+  semanticMaxBankSize: z.number().int().min(1).max(1_000_000).optional(),
+  semanticArtifactDir: z.string().min(1).max(2_000).optional(),
 }) satisfies ZodType<CrawlerRunSettings>;
 
 export const InputDefaultsConfigSchema = z.object({

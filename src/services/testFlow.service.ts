@@ -3,22 +3,12 @@
 // See LICENSE file in the project root for full license information.
 
 import prisma from "@lib/prisma";
+import type { Prisma } from "@generated/prisma/client";
+import type { AllFlowsPayload, SerializedFlow } from "@models/testFlow";
 import { logger } from "@services/logger.service";
 
-interface FlowStep {
-  state_hash: string;
-  transition: Record<string, unknown> | null;
-}
-
-interface SerializedFlow {
-  checkpoint: string;
-  is_clipped: boolean;
-  path: FlowStep[];
-}
-
-export type AllFlowsPayload = Record<string, SerializedFlow[]>;
-
 function resolveCheckpointUrl(flow: SerializedFlow): string {
+  if (flow.checkpoint_url) return flow.checkpoint_url;
   const firstAction = flow.path[1];
   return (firstAction?.transition?.checkpoint_url as string | undefined) ?? "";
 }
@@ -31,6 +21,11 @@ export async function saveAllFlows(
     where: { id: sessionId },
     select: { appVersionId: true },
   });
+
+  await prisma.$transaction([
+    prisma.testFlow.deleteMany({ where: { crawlSessionId: sessionId } }),
+    prisma.testFlowStep.deleteMany({ where: { crawlSessionId: sessionId } }),
+  ]);
 
   const stepsByFingerprint = new Map<string, {
     sourceStateHash: string;
@@ -69,7 +64,7 @@ export async function saveAllFlows(
     targetStateHash: s.targetStateHash,
     actionType: s.actionType,
     actionFingerprint: s.actionFingerprint,
-    transition: s.transition as any,
+    transition: s.transition as Prisma.InputJsonValue,
   }));
 
   if (stepsToInsert.length > 0) {
@@ -120,7 +115,7 @@ export async function saveAllFlows(
             checkpointStateHash: flow.checkpoint,
             checkpointUrl: resolveCheckpointUrl(flow),
             isClipped: flow.is_clipped,
-            stepCount: flow.path.length,
+            stepCount: compositionSteps.length,
             compositions: {
               create: compositionSteps,
             },
