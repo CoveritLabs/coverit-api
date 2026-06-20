@@ -92,11 +92,32 @@ export const InternalScenarioReportArtifactSchema = z.object({
   sizeBytes: z.number().optional(),
 });
 
+export const ScenarioReportDescriptionBlockSchema = z.object({
+  key: z.string(),
+  type: z.enum(["paragraph", "metadata"]),
+  title: z.string(),
+  text: z.string(),
+});
+
+export const StructuredScenarioReportDescriptionSchema = z.object({
+  summary: z.string(),
+  metadata: z.object({
+    reportId: z.string(),
+    scenarioId: z.string(),
+    runId: z.string(),
+    provider: ScenarioIntegrationReportProviderSchema,
+    reporterEmail: z.string(),
+  }),
+  footer: z.string(),
+  blocks: z.array(ScenarioReportDescriptionBlockSchema),
+});
+
 export const InternalScenarioReportContextResponseSchema = z.object({
   report: ScenarioIntegrationReportResponseSchema,
   access: InternalScenarioReportAccessSchema,
   reportingConfig: z.unknown(),
   artifacts: z.array(InternalScenarioReportArtifactSchema),
+  structuredDescription: StructuredScenarioReportDescriptionSchema,
 });
 
 export type ScenarioIntegrationReportProvider = ZodInfer<typeof ScenarioIntegrationReportProviderSchema>;
@@ -141,6 +162,9 @@ export type InternalScenarioReportArtifact = Omit<Plain<ContractInternalScenario
   sizeBytes?: number;
 };
 
+export type ScenarioReportDescriptionBlock = ZodInfer<typeof ScenarioReportDescriptionBlockSchema>;
+export type StructuredScenarioReportDescription = ZodInfer<typeof StructuredScenarioReportDescriptionSchema>;
+
 export type InternalScenarioReportContextResponse = Omit<
   Plain<ContractInternalScenarioReportContextResponse>,
   "report" | "access" | "reportingConfig" | "artifacts"
@@ -149,4 +173,5 @@ export type InternalScenarioReportContextResponse = Omit<
   access: InternalScenarioReportAccess;
   reportingConfig: unknown;
   artifacts: InternalScenarioReportArtifact[];
+  structuredDescription: StructuredScenarioReportDescription;
 };

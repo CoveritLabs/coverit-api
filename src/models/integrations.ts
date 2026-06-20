@@ -28,12 +28,13 @@ export type JiraIssueProject = Plain<ContractJiraIssueProject>;
 export type JiraIssueType = Plain<ContractJiraIssueType>;
 export type JiraReportingConfig = Plain<ContractJiraReportingConfig>;
 export type JiraReportingOptions = Plain<ContractJiraReportingOptions>;
-export type IntegrationReportingConfig = { case: "jira"; value: JiraReportingConfig } | { case: undefined; value?: undefined };
-export type IntegrationReportingOptions = { case: "jira"; value: JiraReportingOptions } | { case: undefined; value?: undefined };
+export type IntegrationStatusReportingConfig = Plain<ContractIntegrationStatusResponse>["reportingConfig"];
+export type IntegrationReportingConfig = Plain<ContractIntegrationReportingConfigResponse>["config"];
+export type IntegrationReportingOptions = Plain<ContractIntegrationReportingOptionsResponse>["options"];
 export type IntegrationStatusResponse = Omit<Plain<ContractIntegrationStatusResponse>, "provider" | "details" | "reportingConfig"> & {
   provider: IntegrationProvider;
   details: IntegrationDetails;
-  reportingConfig: IntegrationReportingConfig;
+  reportingConfig: IntegrationStatusReportingConfig;
 };
 
 export type IntegrationReportingConfigResponse = Omit<Plain<ContractIntegrationReportingConfigResponse>, "provider" | "config"> & {
@@ -73,6 +74,11 @@ export const IntegrationReportingConfigSchema = z.union([
   z.object({}),
 ]);
 
+export const IntegrationStatusReportingConfigSchema = z.union([
+  z.object({ case: z.literal("jiraReportingConfig"), value: JiraReportingConfigSchema }),
+  z.object({}),
+]);
+
 export const IntegrationReportingOptionsSchema = z.union([
   z.object({ case: z.literal("jira"), value: JiraReportingOptionsSchema }),
   z.object({}),
@@ -100,7 +106,7 @@ export const IntegrationStatusResponseSchema = z.object({
     }),
     z.object({}),
   ]),
-  reportingConfig: IntegrationReportingConfigSchema,
+  reportingConfig: IntegrationStatusReportingConfigSchema,
 });
 
 export const IntegrationReportingConfigResponseSchema = z.object({

@@ -3,7 +3,12 @@
 // See LICENSE file in the project root for full license information.
 
 import type { ProjectIntegration } from "@generated/prisma/client";
-import type { IntegrationReportingConfig, IntegrationStatusResponse, JiraReportingConfig } from "@models/integrations";
+import type {
+  IntegrationReportingConfig,
+  IntegrationStatusReportingConfig,
+  IntegrationStatusResponse,
+  JiraReportingConfig,
+} from "@models/integrations";
 import type { IntegrationProvider } from "types/integrations";
 import { JIRA_API_PROVIDER } from "types/integrations";
 import type { UserInfo } from "@models/user";
@@ -34,8 +39,13 @@ export function mapIntegrationStatus(
         siteUrl: integration.jiraSiteUrl ?? undefined,
       },
     },
-    reportingConfig: mapIntegrationReportingConfig(provider, (integration as any).reportingConfig),
+    reportingConfig: mapIntegrationStatusReportingConfig(provider, (integration as any).reportingConfig),
   };
+}
+
+export function mapIntegrationStatusReportingConfig(provider: IntegrationProvider, value: unknown): IntegrationStatusReportingConfig {
+  if (provider !== JIRA_API_PROVIDER) return { case: undefined };
+  return { case: "jiraReportingConfig", value: normalizeJiraReportingConfig(value) };
 }
 
 export function mapIntegrationReportingConfig(provider: IntegrationProvider, value: unknown): IntegrationReportingConfig {

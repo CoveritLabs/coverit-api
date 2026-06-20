@@ -8,9 +8,15 @@ import prisma from "@lib/prisma";
 import { getIntegrationProvider } from "integrations/providers";
 import { mapIntegrationReportingConfig } from "@mappers/integrations.mapper";
 import {
+  cleanReportDescription,
+  isDownloadableArtifact,
+  isReportableScenario,
   mapScenarioIntegrationReport,
+  mapStructuredScenarioReportDescription,
+  selectScenarioArtifacts,
   toDbReportStatus,
   toStoredReportProvider,
+  uniqueStrings,
 } from "@mappers/scenarioReports.mapper";
 import type {
   CreateScenarioIntegrationReportBody,
@@ -85,7 +91,7 @@ export async function createScenarioReport(
           data: {
             status: "PENDING",
             title: body.title,
-            description: body.description,
+            description: cleanReportDescription(body.description),
             reporterUserId: reporter.id,
             reporterEmail: reporter.email,
             artifactIds,
@@ -105,7 +111,7 @@ export async function createScenarioReport(
         provider: storedProvider,
         status: "PENDING",
         title: body.title,
-        description: body.description,
+        description: cleanReportDescription(body.description),
         reporterUserId: reporter.id,
         reporterEmail: reporter.email,
         artifactIds,
@@ -185,6 +191,7 @@ export async function getScenarioReportContext(reportId: string): Promise<Intern
       contentType: artifact.contentType ?? undefined,
       sizeBytes: artifact.sizeBytes == null ? undefined : Number(artifact.sizeBytes),
     })),
+    structuredDescription: mapStructuredScenarioReportDescription(report),
   };
 }
 
@@ -233,10 +240,6 @@ async function findReport(reportId: string): Promise<any> {
   return report;
 }
 
-function isReportableScenario(scenario: any): boolean {
-  return scenario.status === "FAILED" || scenario.status === "PASSED" && scenario.warningCount > 0;
-}
-
 async function assertScenarioArtifacts(runDbId: string, scenario: any, artifactIds: string[]): Promise<void> {
   if (artifactIds.length === 0) return;
   const artifacts = await (prisma as any).regressionArtifact.findMany({ where: { runDbId }, orderBy: { createdAt: "asc" } });
@@ -245,65 +248,4 @@ async function assertScenarioArtifacts(runDbId: string, scenario: any, artifactI
   if (!artifactIds.every((artifactId) => selectableIds.has(artifactId))) {
     throw new BadRequestError(SCENARIO_REPORT_MESSAGES.ARTIFACTS_NOT_FOUND);
   }
-}
-
-function selectScenarioArtifacts(artifacts: any[], scenario: any): any[] {
-  const directArtifacts = artifacts.filter((artifact) => artifact.scenarioId === scenario.id);
-  const prefixes = scenarioArtifactPrefixes(directArtifacts, scenario);
-  const selected = new Set<string>();
-
-  for (const artifact of directArtifacts) selected.add(artifact.id);
-  for (const artifact of artifacts) {
-    if (artifact.scenarioId) continue;
-    const relativePath = artifactRelativePath(artifact);
-    if (relativePath && prefixes.some((prefix) => relativePath.startsWith(prefix))) selected.add(artifact.id);
-  }
-
-  return artifacts.filter((artifact) => selected.has(artifact.id));
-}
-
-function scenarioArtifactPrefixes(directArtifacts: any[], scenario: any): string[] {
-  const prefixes = new Set<string>();
-  for (const artifact of directArtifacts) {
-    const relativePath = artifactRelativePath(artifact);
-    const prefix = relativePath?.match(/^(playwright\/scenarios\/[^/]+\/)/)?.[1];
-    if (prefix) prefixes.add(prefix);
-  }
-
-  const fallbackName = stringValue(scenario.scenarioName) ?? stringValue(scenario.title);
-  if (fallbackName) prefixes.add(`playwright/scenarios/${sanitizeArtifactFolderName(fallbackName)}/`);
-  return [...prefixes];
-}
-
-function artifactRelativePath(artifact: any): string | undefined {
-  const metadata = asRecord(artifact.metadata);
-  return stringValue(metadata.relativePath)?.replace(/\\/g, "/");
-}
-
-function isDownloadableArtifact(artifact: any): boolean {
-  return artifact.uploadStatus === "UPLOADED"
-    && Boolean(artifact.storagePath)
-    && Boolean(artifact.storageUri)
-    && Boolean(artifact.contentType)
-    && artifact.sizeBytes != null;
-}
-
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
-}
-
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-function sanitizeArtifactFolderName(value: string): string {
-  return value
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "artifact";
 }
