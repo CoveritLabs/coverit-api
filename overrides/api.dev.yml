@@ -17,3 +17,7 @@ services:
       - ${API_DIR}/prisma.config.ts:/app/prisma.config.ts
       - ${API_DIR}/nodemon.json:/app/nodemon.json
       - ${API_DIR}/tsconfig.json:/app/tsconfig.json
+
+secrets:
+  npm_token:
+    environment: GITHUB_TOKEN
