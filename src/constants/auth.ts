@@ -5,6 +5,6 @@
 // OAuth provider constants
 // Central place for OAuth-related constants used across the API
 
-import type { OAuthProvider } from 'types/auth'
+import type { OAuthProvider } from "types/auth";
 
-export const VALID_PROVIDERS = new Set<OAuthProvider>(['google', 'github'])
+export const VALID_PROVIDERS = new Set<OAuthProvider>(["google", "github"]);

@@ -7,6 +7,7 @@ import "./project";
 import "./targetApplication";
 import "./crawlSession";
 import "./crawlSchedule";
+import "./regressionRun";
 import { registry } from "./registry";
 
 registry.registerComponent("securitySchemes", "bearerAuth", {

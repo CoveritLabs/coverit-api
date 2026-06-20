@@ -76,3 +76,13 @@ export async function deleteVersion(req: Request, res: Response, next: NextFunct
     next(err);
   }
 }
+
+export async function rotateApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { projectId, appId } = req.params;
+    const response = await targetService.rotateTargetApplicationApiKey(projectId, appId);
+    res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}

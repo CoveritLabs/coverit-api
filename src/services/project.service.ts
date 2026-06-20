@@ -19,6 +19,7 @@ import type {
 import type { UserInfo } from "@models/user";
 import { BadRequestError, NotFoundError, ConflictError } from "@utils/errors";
 import type { MessageResponse } from "@models/common";
+import { deleteArtifactsForApplications } from "@services/artifactCleanup.service";
 import * as userService from "@services/user.service";
 
 function resolveMissingEmailsMessage(notFoundEmails: string[]): string {
@@ -108,6 +109,13 @@ export async function updateProject(projectId: string, input: UpdateProjectReque
 
 export async function deleteProject(projectId: string): Promise<MessageResponse> {
   await assertProjectExists(projectId);
+
+  const targetApplications = await prisma.targetApplication.findMany({
+    where: { projectId },
+    select: { id: true },
+  });
+
+  await deleteArtifactsForApplications(targetApplications.map((application) => application.id));
 
   await prisma.project.delete({ where: { id: projectId } });
 

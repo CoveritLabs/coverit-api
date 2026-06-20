@@ -22,6 +22,14 @@ export function hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+export function generateApplicationApiKey(): string {
+    return `cvit_${crypto.randomBytes(32).toString('base64url')}`;
+}
+
+export function previewApplicationApiKey(apiKey: string): string {
+    return `${apiKey.slice(0, 9)}...${apiKey.slice(-6)}`;
+}
+
 /** Verify an access token and return the userId. Throws on invalid/expired tokens. */
 export function verifyAccessToken(token: string): string {
     const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
