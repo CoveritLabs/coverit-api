@@ -6,16 +6,21 @@ jest.mock("@lib/prisma", () => require("../mocks/prisma"));
 jest.mock("@services/user.service", () => ({ getUser: jest.fn() }));
 jest.mock("@services/integrations.service", () => ({ getValidJiraAccess: jest.fn() }));
 jest.mock("@services/artifactStorage.service", () => ({ artifactStorage: { read: jest.fn() } }));
+jest.mock("@services/notifications.service", () => ({
+  notifyScenarioReportUpdated: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import { SCENARIO_REPORT_MESSAGES } from "@constants/messages";
 import { getUser } from "@services/user.service";
 import { getValidJiraAccess } from "@services/integrations.service";
+import { notifyScenarioReportUpdated } from "@services/notifications.service";
 import * as svc from "@services/scenarioReports.service";
 
 const mockPrisma = prisma as any;
 const mockGetUser = getUser as jest.Mock;
 const mockGetValidJiraAccess = getValidJiraAccess as jest.Mock;
+const mockNotifyScenarioReportUpdated = notifyScenarioReportUpdated as jest.Mock;
 
 const now = new Date("2026-06-19T12:00:00.000Z");
 const app = { id: "app1", projectId: "p1" };
@@ -230,5 +235,18 @@ describe("scenarioReports.service", () => {
         { key: "source", type: "metadata", title: "Source", text: "Generated automatically by CoverIt" },
       ],
     });
+  });
+
+  test("delegates notification handling after patching a report", async () => {
+    const updatedReport = report({
+      status: "CREATED",
+      externalIssueKey: "COV-1",
+      externalIssueUrl: "https://site.atlassian.net/browse/COV-1",
+    });
+    mockPrisma.scenarioIntegrationReport.update.mockResolvedValue(updatedReport);
+
+    await svc.patchScenarioReport("report-1", { status: "created", externalIssueKey: "COV-1" });
+
+    expect(mockNotifyScenarioReportUpdated).toHaveBeenCalledWith(updatedReport, { terminalFailureAttemptCount: 5 });
   });
 });

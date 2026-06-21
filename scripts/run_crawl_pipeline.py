@@ -27,7 +27,7 @@ VERSION_NAME_PREFIX = "smoke-version"
 VERSION_NAME = VERSION_NAME_PREFIX
 WATCH_SECONDS = 1000000
 POLL_SECONDS = 5
-CRAWL_TRIGGER_MANUAL = 1
+CRAWL_TRIGGER_ON_DEMAND = 5
 TERMINAL_STATUSES = {"COMPLETED", "FAILED", "ABORTED", 3, 4, 5}
 
 BASE_URL = "https://tryscrapeme.com/"
@@ -217,7 +217,7 @@ def main() -> int:
         "POST",
         f"/projects/{project_id}/target-applications/{app_id}/versions/{version_id}/crawl-sessions",
         {
-            "triggerType": CRAWL_TRIGGER_MANUAL,
+            "triggerType": CRAWL_TRIGGER_ON_DEMAND,
             "crawlConfig": {
                 "maxStates": 30,
                 "maxDepth": 10,

@@ -10,7 +10,7 @@
 jest.mock("@lib/redis", () => require("../mocks/redis"));
 
 import redis from "@lib/redis";
-import { cacheGetJSON, cacheSetJSON, cacheDel, cacheDelByPattern, cacheScan } from "@lib/cache";
+import { cacheGetJSON, cacheSetJSON, cacheDel, cacheDelByPattern, cacheKeys, cacheScan } from "@lib/cache";
 
 const mockRedis = redis as any;
 
@@ -76,5 +76,9 @@ describe("cache utilities", () => {
     await cacheDelByPattern("pattern:*");
 
     expect(redis.del).toHaveBeenCalledWith("keyA", "keyB");
+  });
+
+  test("cacheKeys includes manual session tickets", () => {
+    expect(cacheKeys.manualSession.ticket("ticket-1")).toBe("manual-session:ticket:ticket-1");
   });
 });
