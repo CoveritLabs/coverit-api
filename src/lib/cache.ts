@@ -70,6 +70,9 @@ export const cacheKeys = {
   crawlSession: {
     pid: (sessionId: string): string => `session:${sessionId}:pid`,
   },
+  manualSession: {
+    ticket: (ticket: string): string => `manual-session:ticket:${ticket}`,
+  },
 } as const;
 
 export async function cacheGetJSON<T>(key: string, context?: string): Promise<T | CacheMiss> {

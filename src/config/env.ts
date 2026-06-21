@@ -16,6 +16,7 @@ export const env = {
   CACHE_TTL_SECONDS: parseInt(process.env.CACHE_TTL_SECONDS ?? "60", 10),
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
   INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN ?? "",
+  MANUAL_RECORDING_TICKET_TTL_SECONDS: parseInt(process.env.MANUAL_RECORDING_TICKET_TTL_SECONDS ?? "60", 10),
 
   // OAuth
   FRONTEND_URL: process.env.FRONTEND_URL ?? "http://localhost:5173",

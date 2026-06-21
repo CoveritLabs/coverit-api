@@ -18,4 +18,5 @@ export const CRAWL_SESSION_MESSAGES = {
   ABORTED: "Crawl session aborted successfully",
   ALREADY_ABORTED: "Crawl session already aborted",
   INVALID_STATUS: "Crawl session status does not allow this action",
+  MANUAL_TRIGGER_NOT_ALLOWED: "Manual sessions are not allowed for automated crawl sessions",
 } as const;
