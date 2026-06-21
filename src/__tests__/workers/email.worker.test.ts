@@ -9,6 +9,7 @@ let workerCallback: any;
 
 jest.mock("bullmq", () => {
   return {
+    Queue: jest.fn().mockImplementation(() => ({})),
     Worker: jest.fn().mockImplementation((name, cb) => {
       workerCallback = cb;
       return {};
@@ -38,6 +39,68 @@ describe("workers/email.worker", () => {
 
     await workerCallback(job);
     expect(emailService.sendResetEmail).toHaveBeenCalledWith("u@u.com", "link", "U");
+  });
+
+  test("workerCallback delegates issue-created job", async () => {
+    jest.clearAllMocks();
+    const job = {
+      name: "issue-created",
+      data: { email: "u@u.com", provider: "jira", key: "COV-1", title: "Bug", url: "https://jira/COV-1", status: "created", reportId: "r1" },
+    };
+
+    await workerCallback(job);
+    expect(emailService.sendIssueCreatedEmail).toHaveBeenCalledWith("u@u.com", {
+      provider: "jira",
+      key: "COV-1",
+      title: "Bug",
+      url: "https://jira/COV-1",
+      status: "created",
+      reportId: "r1",
+    });
+  });
+
+  test("workerCallback delegates issue-failed job", async () => {
+    jest.clearAllMocks();
+    const job = {
+      name: "issue-failed",
+      data: { email: "u@u.com", provider: "jira", title: "Bug", errorMessage: "No auth", reportId: "r1" },
+    };
+
+    await workerCallback(job);
+    expect(emailService.sendIssueFailedEmail).toHaveBeenCalledWith("u@u.com", {
+      provider: "jira",
+      title: "Bug",
+      errorMessage: "No auth",
+      reportId: "r1",
+    });
+  });
+
+  test("workerCallback delegates framework notification jobs", async () => {
+    jest.clearAllMocks();
+    await workerCallback({
+      name: "framework-generated",
+      data: { email: "u@u.com", name: "U", sessionId: "s1", applicationName: "App", branchName: "codegen/1", changedFiles: [], noChanges: true, pushed: false },
+    });
+    expect(emailService.sendFrameworkGeneratedEmail).toHaveBeenCalledWith("u@u.com", {
+      name: "U",
+      sessionId: "s1",
+      applicationName: "App",
+      branchName: "codegen/1",
+      changedFiles: [],
+      noChanges: true,
+      pushed: false,
+    });
+
+    await workerCallback({
+      name: "framework-generation-failed",
+      data: { email: "u@u.com", name: "U", sessionId: "s1", applicationName: "App", errorMessage: "boom" },
+    });
+    expect(emailService.sendFrameworkGenerationFailedEmail).toHaveBeenCalledWith("u@u.com", {
+      name: "U",
+      sessionId: "s1",
+      applicationName: "App",
+      errorMessage: "boom",
+    });
   });
 
   test("workerCallback ignores other job names", async () => {

@@ -30,7 +30,7 @@ function jobPayload(functionName: string, args: unknown[]): string {
   });
 }
 
-export async function enqueueCrawlSession(sessionId: string): Promise<string> {
+async function enqueueArqJob(jobId: string, functionName: string, args: unknown[]): Promise<string> {
   const script = `
 if redis.call("exists", KEYS[1]) == 1 or redis.call("exists", KEYS[2]) == 1 then
   return nil
@@ -39,7 +39,6 @@ redis.call("psetex", KEYS[1], ARGV[1], ARGV[2])
 redis.call("zadd", KEYS[3], ARGV[3], ARGV[4])
 return ARGV[4]
 `;
-  const jobId = sessionId;
   const result = await redis.eval(
     script,
     3,
@@ -47,7 +46,7 @@ return ARGV[4]
     `${crawlArqConfig.resultKeyPrefix}${jobId}`,
     crawlArqConfig.queueName,
     String(expiryMs()),
-    jobPayload("crawl_session", [sessionId]),
+    jobPayload(functionName, args),
     String(nowMs()),
     jobId,
   );
@@ -55,6 +54,14 @@ return ARGV[4]
     return jobId;
   }
   return String(result);
+}
+
+export async function enqueueCrawlSession(sessionId: string): Promise<string> {
+  return enqueueArqJob(sessionId, "crawl_session", [sessionId]);
+}
+
+export async function enqueueManualRecordSession(sessionId: string): Promise<string> {
+  return enqueueArqJob(sessionId, "manual_record_session", [sessionId]);
 }
 
 export async function abortCrawlSession(sessionId: string): Promise<void> {

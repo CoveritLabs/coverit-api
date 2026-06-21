@@ -30,6 +30,7 @@ import { getValidJiraAccess } from "@services/integrations.service";
 import { getUser } from "@services/user.service";
 import { BadRequestError, NotFoundError, UnauthorizedError } from "@utils/errors";
 import { ARTIFACT_STORAGE } from "@constants/artifactStorage";
+import { notifyScenarioReportUpdated } from "@services/notifications.service";
 
 const MAX_REPORT_ATTEMPTS = 5;
 
@@ -231,6 +232,7 @@ export async function patchScenarioReport(
     where: { id: reportId },
     data,
   });
+  await notifyScenarioReportUpdated(report, { terminalFailureAttemptCount: MAX_REPORT_ATTEMPTS });
   return { report: mapScenarioIntegrationReport(report) };
 }
 

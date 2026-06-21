@@ -16,6 +16,7 @@ export const env = {
   CACHE_TTL_SECONDS: parseInt(process.env.CACHE_TTL_SECONDS ?? "60", 10),
   API_PREFIX: process.env.API_PREFIX ?? "/api/v1",
   INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN ?? "",
+  MANUAL_SESSION_TICKET_TTL_SECONDS: parseInt(process.env.MANUAL_SESSION_TICKET_TTL_SECONDS ?? "60", 10),
 
   // OAuth
   FRONTEND_URL: process.env.FRONTEND_URL ?? "http://localhost:5173",
@@ -36,7 +37,12 @@ export const env = {
   // Emails
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
   RESET_PASSWORD_EMAIL: process.env.RESET_PASSWORD_EMAIL ?? "Coverit <support@updates.coverit.cyou>",
+  NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL ?? "Coverit <notifications@updates.coverit.cyou>",
   RESET_PASSWORD_TEMPLATE_ID: process.env.RESET_PASSWORD_TEMPLATE_ID ?? "",
+  ISSUE_CREATED_TEMPLATE_ID: process.env.ISSUE_CREATED_TEMPLATE_ID ?? "",
+  ISSUE_FAILED_TEMPLATE_ID: process.env.ISSUE_FAILED_TEMPLATE_ID ?? "",
+  CODE_GENERATED_TEMPLATE_ID: process.env.CODE_GENERATED_TEMPLATE_ID ?? "",
+  CODE_GENERATION_FAILED_TEMPLATE_ID: process.env.CODE_GENERATION_FAILED_TEMPLATE_ID ?? "",
 
   // Regression artifacts
   DAGSHUB_OWNER: process.env.DAGSHUB_OWNER ?? "",
@@ -59,6 +65,7 @@ console.info("Loaded environment variables:", {
   RESET_TOKEN_TTL_SECONDS: env.RESET_TOKEN_TTL_SECONDS,
   API_PREFIX: env.API_PREFIX,
   INTERNAL_SERVICE_TOKEN: env.INTERNAL_SERVICE_TOKEN ? "****" : "(not set)",
+  MANUAL_SESSION_TICKET_TTL_SECONDS: env.MANUAL_SESSION_TICKET_TTL_SECONDS,
   FRONTEND_URL: env.FRONTEND_URL,
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? "****" : "(not set)",
   GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? "****" : "(not set)",
@@ -74,6 +81,10 @@ console.info("Loaded environment variables:", {
   RESEND_API_KEY: env.RESEND_API_KEY ? "****" : "(not set)",
   RESET_PASSWORD_EMAIL: env.RESET_PASSWORD_EMAIL,
   RESET_PASSWORD_TEMPLATE_ID: env.RESET_PASSWORD_TEMPLATE_ID ? "****" : "(not set)",
+  ISSUE_CREATED_TEMPLATE_ID: env.ISSUE_CREATED_TEMPLATE_ID ? "****" : "(not set)",
+  ISSUE_FAILED_TEMPLATE_ID: env.ISSUE_FAILED_TEMPLATE_ID ? "****" : "(not set)",
+  CODE_GENERATED_TEMPLATE_ID: env.CODE_GENERATED_TEMPLATE_ID ? "****" : "(not set)",
+  CODE_GENERATION_FAILED_TEMPLATE_ID: env.CODE_GENERATION_FAILED_TEMPLATE_ID ? "****" : "(not set)",
   DAGSHUB_OWNER: env.DAGSHUB_OWNER,
   DAGSHUB_BUCKET_NAME: env.DAGSHUB_BUCKET_NAME,
   DAGSHUB_TOKEN: env.DAGSHUB_TOKEN ? "****" : "(not set)",

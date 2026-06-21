@@ -9,12 +9,13 @@ import * as crawlScheduleService from "@services/crawlSchedule.service";
 import { AppParamsSchema } from "@models/crawlSession";
 import { CreateCrawlScheduleRequestSchema, UpdateCrawlScheduleRequestSchema } from "@models/crawlSchedule";
 import { z } from "@utils/zod";
+import { getCurrentUserId } from "@api/middlewares/requireAuth";
 
 export async function createSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { projectId, appId } = AppParamsSchema.parse(req.params);
     const body = CreateCrawlScheduleRequestSchema.parse(req.body);
-    const result = await crawlScheduleService.createSchedule(projectId, appId, body);
+    const result = await crawlScheduleService.createSchedule(projectId, appId, getCurrentUserId(req), body);
     res.status(StatusCodes.CREATED).json(result);
   } catch (err) {
     next(err);

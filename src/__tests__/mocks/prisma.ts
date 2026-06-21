@@ -21,8 +21,36 @@ const prisma: Record<string, any> = {
     targetApplication: {
         findUnique: jest.fn(),
     },
+    targetApplicationVersion: {
+        findFirst: jest.fn(),
+    },
+    crawlSession: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        delete: jest.fn(),
+    },
+    crawlSchedule: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+    },
     regressionRun: {
         findUnique: jest.fn(),
+    },
+    regressionCodebase: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+        findMany: jest.fn(),
     },
     regressionScenario: {
         findFirst: jest.fn(),

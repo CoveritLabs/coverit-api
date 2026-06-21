@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license information.
 
 import prisma from "@lib/prisma";
-import { CrawlStatus as PrismaCrawlStatus } from "@generated/prisma/client";
+import { CrawlStatus as PrismaCrawlStatus, CrawlTriggerType as PrismaCrawlTriggerType } from "@generated/prisma/client";
 import {
   fromDbCrawlStatus,
   fromDbCrawlTriggerType,
@@ -14,13 +14,14 @@ import {
   toPersistedCrawlConfig,
 } from "@mappers/crawlSession.mapper";
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
-import { CRAWL_SESSION_MESSAGES } from "@constants/messages";
+import { CRAWL_SESSION_MESSAGES, TARGET_APPLICATION_VALIDATION } from "@constants/messages";
 import { BadRequestError, ConflictError, NotFoundError } from "@utils/errors";
 import type { MessageResponse } from "@models/common";
 import {
   CrawlConfigSchema,
   CodegenConfigSchema,
   type ApplicationVersionCrawlSessionsResponse,
+  CrawlTriggerType,
   type CrawlSessionData,
   type GetSessionsQuery,
   type CreateCrawlSessionRequest,
@@ -129,6 +130,7 @@ export async function createSession(
   projectId: string,
   appId: string,
   versionId: string,
+  creatorUserId: string,
   input: CreateCrawlSessionRequest,
 ): Promise<CrawlSessionData> {
   const app = await requireTargetApplication(projectId, appId);
@@ -139,7 +141,11 @@ export async function createSession(
   }
 
   if (!app.baseUrl) {
-    throw new BadRequestError("Target application base URL is required");
+    throw new BadRequestError(TARGET_APPLICATION_VALIDATION.BASE_URL_REQUIRED);
+  }
+
+  if (input.triggerType === CrawlTriggerType.MANUAL) {
+    throw new BadRequestError(CRAWL_SESSION_MESSAGES.MANUAL_TRIGGER_NOT_ALLOWED);
   }
 
   const parsedConfig = CrawlConfigSchema.parse(input.crawlConfig ?? { ...DEFAULT_CRAWL_CONFIG });
@@ -148,6 +154,7 @@ export async function createSession(
   const newSession = await prisma.crawlSession.create({
     data: {
       appVersionId: versionId,
+      creatorUserId,
       triggerType: toDbCrawlTriggerType(input.triggerType) as unknown as DbCrawlTriggerType,
       config: persistedConfig,
       regressionCodebaseId: input.regressionCodebaseId ?? null,
@@ -217,6 +224,10 @@ export async function startSession(projectId: string, appId: string, versionId: 
     where: { id: sessionId, appVersionId: versionId },
   });
   if (!session) throw new NotFoundError(CRAWL_SESSION_MESSAGES.NOT_FOUND);
+
+  if (session.triggerType === PrismaCrawlTriggerType.MANUAL) {
+    throw new ConflictError(CRAWL_SESSION_MESSAGES.MANUAL_TRIGGER_NOT_ALLOWED);
+  }
 
   if (session.status === PrismaCrawlStatus.NEW) {
     const queued = await prisma.crawlSession.updateMany({

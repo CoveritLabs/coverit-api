@@ -14,6 +14,7 @@ import {
 } from "@models/targetApplication";
 import crawlSessionRoutes from "@api/routes/crawlSession.routes";
 import crawlScheduleRoutes from "@api/routes/crawlSchedule.routes";
+import manualSessionRoutes from "@api/routes/manualSession.routes";
 import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
 import regressionRunRoutes from "@api/routes/regressionRun.routes";
 
@@ -31,6 +32,10 @@ router.post("/:appId/api-key/rotate", requireProjectAdmin, targetController.rota
 router.post("/:appId/versions", requireProjectMember, validateBody(CreateTargetApplicationVersionRequestSchema), targetController.createVersion);
 router.delete("/:appId/versions/:versionId", requireProjectAdmin, targetController.deleteVersion);
 
+// Manual sessions
+router.use("/:appId/versions/:versionId/manual-recordings", manualSessionRoutes);
+
+// Crawl sessions
 router.use("/:appId/versions/:versionId/crawl-sessions", crawlSessionRoutes);
 
 // Crawl schedules
