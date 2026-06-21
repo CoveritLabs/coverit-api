@@ -21,6 +21,8 @@ model User {
 
   accounts Account[]
   projectMembers ProjectMember[]
+  createdCrawlSessions CrawlSession[]
+  createdCrawlSchedules CrawlSchedule[]
 
   @@map("users")
 }
@@ -81,6 +83,7 @@ enum CrawlTriggerType {
   SCHEDULED
   CI_TRIGGER
   WEBHOOK
+  ON_DEMAND
 }
 
 enum CrawlScheduleType {
@@ -390,6 +393,7 @@ model RegressionCodebase {
 model CrawlSchedule {
   id                   String   @id @default(uuid()) @db.Uuid
   targetApplicationId  String   @map("target_application_id") @db.Uuid
+  creatorUserId        String   @map("creator_user_id") @db.Uuid
   versionId            String?  @map("version_id") @db.Uuid
   regressionCodebaseId String?  @map("regression_codebase_id") @db.Uuid
   scheduleType         CrawlScheduleType @map("schedule_type")
@@ -407,6 +411,7 @@ model CrawlSchedule {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  creator User @relation(fields: [creatorUserId], references: [id], onDelete: Cascade)
   version TargetApplicationVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
   regressionCodebase RegressionCodebase? @relation(fields: [regressionCodebaseId], references: [id], onDelete: SetNull)
   sessions CrawlSession[]
@@ -418,6 +423,7 @@ model CrawlSchedule {
 model CrawlSession {
   id              String    @id @default(uuid()) @map("crawl_session_id") @db.Uuid
   appVersionId    String    @map("app_version_id") @db.Uuid
+  creatorUserId   String    @map("creator_user_id") @db.Uuid
   regressionCodebaseId String? @map("regression_codebase_id") @db.Uuid
   scheduleId      String?   @map("schedule_id") @db.Uuid
   status          CrawlStatus @default(NEW)
@@ -432,6 +438,7 @@ model CrawlSession {
   baseUrlSnapshot String?   @map("base_url_snapshot")
   error           String?   @db.Text
   appVersion      TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
+  creator         User @relation(fields: [creatorUserId], references: [id], onDelete: Cascade)
   regressionCodebase RegressionCodebase? @relation(fields: [regressionCodebaseId], references: [id], onDelete: SetNull)
   schedule CrawlSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   testFlows     TestFlow[]
