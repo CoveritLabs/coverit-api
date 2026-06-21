@@ -102,7 +102,12 @@ function validateScheduleInput(
   }
 }
 
-export async function createSchedule(projectId: string, appId: string, input: CreateCrawlScheduleRequest): Promise<CrawlScheduleData> {
+export async function createSchedule(
+  projectId: string,
+  appId: string,
+  creatorUserId: string,
+  input: CreateCrawlScheduleRequest,
+): Promise<CrawlScheduleData> {
   await requireTargetApplication(projectId, appId);
   validateScheduleInput(input);
 
@@ -125,6 +130,7 @@ export async function createSchedule(projectId: string, appId: string, input: Cr
   const schedule = await prisma.crawlSchedule.create({
     data: {
       targetApplicationId: appId,
+      creatorUserId,
       versionId: input.mode === CrawlScheduleMode.FIXED_VERSION ? input.versionId : null,
       regressionCodebaseId: input.regressionCodebaseId ?? null,
       scheduleType: toDbCrawlScheduleType(input.scheduleType),

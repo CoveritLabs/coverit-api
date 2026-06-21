@@ -130,6 +130,7 @@ export async function createSession(
   projectId: string,
   appId: string,
   versionId: string,
+  creatorUserId: string,
   input: CreateCrawlSessionRequest,
 ): Promise<CrawlSessionData> {
   const app = await requireTargetApplication(projectId, appId);
@@ -153,6 +154,7 @@ export async function createSession(
   const newSession = await prisma.crawlSession.create({
     data: {
       appVersionId: versionId,
+      creatorUserId,
       triggerType: toDbCrawlTriggerType(input.triggerType) as unknown as DbCrawlTriggerType,
       config: persistedConfig,
       regressionCodebaseId: input.regressionCodebaseId ?? null,

@@ -6,6 +6,7 @@ import { Request, Response, NextFunction } from "express";
 import * as crawlService from "@services/crawlSession.service";
 import { StatusCodes } from "http-status-codes";
 import { AppVersionParamsSchema, CrawlSessionParamsSchema, CreateCrawlSessionRequestSchema, GetSessionsQuerySchema } from "@models/crawlSession";
+import { getCurrentUserId } from "@api/middlewares/requireAuth";
 
 export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -22,7 +23,7 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
   try {
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
     const body = CreateCrawlSessionRequestSchema.parse(req.body);
-    const result = await crawlService.createSession(projectId, appId, versionId, body);
+    const result = await crawlService.createSession(projectId, appId, versionId, getCurrentUserId(req), body);
     res.status(StatusCodes.CREATED).json(result);
   } catch (e) {
     next(e);
