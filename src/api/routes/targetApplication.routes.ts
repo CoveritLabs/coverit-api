@@ -17,6 +17,7 @@ import crawlScheduleRoutes from "@api/routes/crawlSchedule.routes";
 import manualSessionRoutes from "@api/routes/manualSession.routes";
 import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
 import regressionRunRoutes from "@api/routes/regressionRun.routes";
+import testFlowRoutes from "@api/routes/testFlow.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -34,6 +35,9 @@ router.delete("/:appId/versions/:versionId", requireProjectAdmin, targetControll
 
 // Manual sessions
 router.use("/:appId/versions/:versionId/manual-recordings", manualSessionRoutes);
+
+// Test flows
+router.use("/:appId/test-flows", requireProjectMembership, testFlowRoutes);
 
 // Crawl sessions
 router.use("/:appId/versions/:versionId/crawl-sessions", crawlSessionRoutes);
