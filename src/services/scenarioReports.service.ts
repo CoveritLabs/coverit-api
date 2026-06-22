@@ -280,9 +280,15 @@ export async function claimScenarioReport(body: InternalClaimScenarioReportBody)
 
   const candidate = body.reportId
     ? await (prisma as any).scenarioIntegrationReport.findFirst({ where: { ...where, id: body.reportId } })
-    : await (prisma as any).scenarioIntegrationReport.findFirst({ where, orderBy: { createdAt: "asc" } });
+    : (
+        await (prisma as any).scenarioIntegrationReport.findMany({
+          where,
+          orderBy: { createdAt: "asc" },
+          take: MAX_REPORT_ATTEMPTS * 5,
+        })
+      ).find((report: any) => !isManualBugReport(report));
 
-  if (!candidate) return null;
+  if (!candidate || isManualBugReport(candidate)) return null;
 
   const updated = await (prisma as any).scenarioIntegrationReport.updateMany({
     where: {
@@ -370,7 +376,10 @@ export async function patchScenarioReport(reportId: string, body: InternalPatchS
   if (body.externalIssueUrl !== undefined) data.externalIssueUrl = body.externalIssueUrl;
   if (body.attachedArtifactIds !== undefined) data.attachedArtifactIds = uniqueStrings(body.attachedArtifactIds);
   if (body.lastError !== undefined) data.lastError = body.lastError;
-  if (body.providerData !== undefined) data.providerData = body.providerData as any;
+  if (body.providerData !== undefined) {
+    const existing = await findReport(reportId);
+    data.providerData = mergeProviderData(existing.providerData, body.providerData);
+  }
 
   const report = await (prisma as any).scenarioIntegrationReport.update({
     where: { id: reportId },
@@ -404,9 +413,6 @@ function manualBugDescription(body: InternalCreateManualBugReportBody): string {
     ...(body.currentUrl ? [`Current URL: ${body.currentUrl}`] : []),
     `Flow ID: ${body.flowId}`,
   ];
-  if (body.recordedEvents.length > 0) {
-    lines.push("", "Recorded events:", JSON.stringify(body.recordedEvents, null, 2));
-  }
   return lines.join("\n").trim();
 }
 
@@ -419,4 +425,23 @@ function manualBugProviderData(body: InternalCreateManualBugReportBody): Record<
     severity: body.severity,
     currentUrl: body.currentUrl,
   };
+}
+
+function isManualBugReport(report: any): boolean {
+  const providerData = report?.providerData;
+  return !!(
+    providerData &&
+    typeof providerData === "object" &&
+    !Array.isArray(providerData) &&
+    "manualBug" in providerData
+  );
+}
+
+function mergeProviderData(existing: unknown, patch: unknown): unknown {
+  if (!isPlainRecord(existing) || !isPlainRecord(patch)) return patch;
+  return { ...existing, ...patch };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }

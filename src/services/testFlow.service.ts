@@ -174,6 +174,7 @@ export async function generateTestFlow(
 
   const payload = {
     session_id: mappedFlow.crawlSessionId,
+    graph_id: graphIdForTestFlow(mappedFlow),
     regression_codebase_id: regressionCodebase.id,
     codegen_config: input.codegenConfig,
     flow_ids: [mappedFlow.id],
@@ -193,6 +194,10 @@ export async function generateTestFlow(
     flowId: mappedFlow.id,
     jobId,
   };
+}
+
+function graphIdForTestFlow(flow: MappedTestFlow): string {
+  return flow.testFlowType === "COVERAGE" ? flow.appVersionId : flow.crawlSessionId;
 }
 
 export async function markTestFlowsGenerated(sessionId: string, flowIds: string[], generatedAt = new Date()): Promise<number> {
