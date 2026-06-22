@@ -159,6 +159,7 @@ describe("testFlow.service", () => {
     });
     expect(mockEnqueueBddGeneration).toHaveBeenCalledWith({
       session_id: "session-1",
+      graph_id: "session-1",
       regression_codebase_id: "codebase-1",
       codegen_config: {
         codegenBranch: "auto-tests",
@@ -174,6 +175,54 @@ describe("testFlow.service", () => {
         },
       ],
     });
+  });
+
+  test("queues docgen generation for a coverage flow with app version graph id", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(
+      flow({
+        id: "flow-coverage",
+        testFlowType: "COVERAGE",
+        generatedAt: new Date("2026-06-22T00:04:00.000Z"),
+        modifiedAt: new Date("2026-06-22T00:05:00.000Z"),
+      }),
+    );
+
+    await svc.generateTestFlow("project-1", "app-1", "flow-coverage", {
+      regressionCodebaseId: "codebase-1",
+      codegenConfig: { codegenBranch: "auto-tests", prTargetBranch: "main" },
+    });
+
+    expect(mockEnqueueBddGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session_id: "session-1",
+        graph_id: "version-1",
+        flow_ids: ["flow-coverage"],
+      }),
+    );
+  });
+
+  test("queues docgen generation for a bug reproduction flow with crawl session graph id", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(
+      flow({
+        id: "flow-bug",
+        testFlowType: "BUG_REPRODUCTION",
+        generatedAt: new Date("2026-06-22T00:04:00.000Z"),
+        modifiedAt: new Date("2026-06-22T00:05:00.000Z"),
+      }),
+    );
+
+    await svc.generateTestFlow("project-1", "app-1", "flow-bug", {
+      regressionCodebaseId: "codebase-1",
+      codegenConfig: { codegenBranch: "auto-tests", prTargetBranch: "main" },
+    });
+
+    expect(mockEnqueueBddGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session_id: "session-1",
+        graph_id: "session-1",
+        flow_ids: ["flow-bug"],
+      }),
+    );
   });
 
   test("rejects generation for a generated flow", async () => {

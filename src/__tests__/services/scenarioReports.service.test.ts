@@ -98,6 +98,7 @@ describe("scenarioReports.service", () => {
     mockPrisma.projectIntegration.findUnique.mockResolvedValue(integration);
     mockPrisma.regressionArtifact.findMany.mockResolvedValue([uploadedArtifact]);
     mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(null);
+    mockPrisma.scenarioIntegrationReport.findMany.mockResolvedValue([]);
     mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(report());
     mockPrisma.regressionRun.upsert.mockResolvedValue({ ...run, id: "manual-run-db-1" });
     mockPrisma.regressionScenario.upsert.mockResolvedValue({ ...failedScenario, id: "manual-scenario-1", runDbId: "manual-run-db-1" });
@@ -268,6 +269,26 @@ describe("scenarioReports.service", () => {
     expect(mockNotifyScenarioReportUpdated).toHaveBeenCalledWith(updatedReport, { terminalFailureAttemptCount: 5 });
   });
 
+  test("preserves manual bug provider data when patching provider issue fields", async () => {
+    const existingReport = report({
+      providerData: { manualBug: { flowId: "flow-1" } },
+    });
+    mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(existingReport);
+    mockPrisma.scenarioIntegrationReport.update.mockResolvedValue(
+      report({ providerData: { manualBug: { flowId: "flow-1" }, jiraIssueId: "10001" } }),
+    );
+
+    await svc.patchScenarioReport("report-1", { providerData: { jiraIssueId: "10001" } });
+
+    expect(mockPrisma.scenarioIntegrationReport.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          providerData: { manualBug: { flowId: "flow-1" }, jiraIssueId: "10001" },
+        }),
+      }),
+    );
+  });
+
   test("creates a manual bug report before enqueueing docgen", async () => {
     mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(
       report({
@@ -300,6 +321,7 @@ describe("scenarioReports.service", () => {
         data: expect.objectContaining({
           provider: "JIRA",
           status: "PENDING",
+          description: "Checkout fails\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
           artifactIds: [],
           providerData: expect.objectContaining({
             manualBug: expect.objectContaining({ flowId: "22222222-2222-4222-8222-222222222222" }),
@@ -307,6 +329,7 @@ describe("scenarioReports.service", () => {
         }),
       }),
     );
+    expect(mockPrisma.scenarioIntegrationReport.create.mock.calls[0][0].data.description).not.toContain("Recorded events:");
     expect(mockEnqueueManualBugReport).toHaveBeenCalledWith(
       expect.objectContaining({
         report_id: "manual-report-1",
@@ -317,5 +340,33 @@ describe("scenarioReports.service", () => {
       }),
     );
     expect(response).toMatchObject({ report: { id: "manual-report-1" }, jobId: "docgen:manual-bug:job-1" });
+  });
+
+  test("generic scenario report claim skips manual bug reports", async () => {
+    mockPrisma.scenarioIntegrationReport.findMany.mockResolvedValue([
+      report({ id: "manual-report-1", providerData: { manualBug: { flowId: "flow-1" } } }),
+      report({ id: "regular-report-1", providerData: null }),
+    ]);
+    mockPrisma.scenarioIntegrationReport.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(report({ id: "regular-report-1" }));
+
+    const response = await svc.claimScenarioReport({ provider: "jira" });
+
+    expect(mockPrisma.scenarioIntegrationReport.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "regular-report-1" }),
+      }),
+    );
+    expect(response?.report.id).toBe("regular-report-1");
+  });
+
+  test("generic scenario report claim rejects explicit manual bug report ids", async () => {
+    mockPrisma.scenarioIntegrationReport.findFirst.mockResolvedValue(
+      report({ id: "manual-report-1", providerData: { manualBug: { flowId: "flow-1" } } }),
+    );
+
+    await expect(svc.claimScenarioReport({ reportId: "manual-report-1", provider: "jira" })).resolves.toBeNull();
+
+    expect(mockPrisma.scenarioIntegrationReport.updateMany).not.toHaveBeenCalled();
   });
 });

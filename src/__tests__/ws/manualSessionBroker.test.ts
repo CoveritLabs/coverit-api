@@ -20,4 +20,8 @@ describe("manualSessionBroker websocket allowlists", () => {
     expect(source).toContain('"flow.rewound"');
     expect(source).toContain('"recorded.step"');
   });
+
+  test("allows manual session ttl messages from the crawler", () => {
+    expect(source).toContain('"session.ttl"');
+  });
 });
