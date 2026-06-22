@@ -76,11 +76,8 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
 
   const persisted: Record<string, Prisma.InputJsonValue> = {};
   if (config.maxStates !== undefined) persisted.maxStates = config.maxStates;
-  if (config.maxDepth !== undefined) persisted.maxDepth = config.maxDepth;
-  if (config.includeUrlPatterns !== undefined) persisted.includeUrlPatterns = config.includeUrlPatterns;
-  if (config.excludeUrlPatterns !== undefined) persisted.excludeUrlPatterns = config.excludeUrlPatterns;
-  if (config.enableSemanticDecisions !== undefined) persisted.enableSemanticDecisions = config.enableSemanticDecisions;
   if (config.timeoutSeconds !== undefined) persisted.timeoutSeconds = config.timeoutSeconds;
+  if (config.generateTestFlows !== undefined) persisted.generateTestFlows = config.generateTestFlows;
   if (Object.keys(crawlerSettings).length > 0) persisted.crawlerSettings = crawlerSettings;
   if (input) {
     persisted.inputDefaults = {
@@ -127,8 +124,9 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
   };
 
   return {
-    ...defaults,
-    ...persisted,
+    maxStates: persisted.maxStates ?? persisted.max_states ?? defaults.maxStates,
+    timeoutSeconds: persisted.timeoutSeconds ?? persisted.timeout_seconds ?? defaults.timeoutSeconds,
+    generateTestFlows: persisted.generateTestFlows ?? persisted.generate_test_flows ?? defaults.generateTestFlows,
     crawlerSettings,
     inputDefaults:
       Object.keys(input).length > 0

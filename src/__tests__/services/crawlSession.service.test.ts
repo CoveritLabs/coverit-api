@@ -43,17 +43,25 @@ describe("crawlSession.service", () => {
       regressionCodebaseId: "cb1",
       crawlConfig: {
         maxStates: 10,
-        maxDepth: 3,
-        includeUrlPatterns: [],
-        excludeUrlPatterns: [],
-        enableSemanticDecisions: false,
         timeoutSeconds: 60,
+        generateTestFlows: true,
+        crawlerSettings: {
+          useSemanticDiversity: false,
+        },
       },
     });
 
     expect(mockPrisma.crawlSession.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         creatorUserId: "creator-1",
+        config: expect.objectContaining({
+          maxStates: 10,
+          timeoutSeconds: 60,
+          generateTestFlows: true,
+          crawlerSettings: expect.objectContaining({
+            use_semantic_diversity: false,
+          }),
+        }),
       }),
     }));
   });

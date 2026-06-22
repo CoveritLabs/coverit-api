@@ -3,17 +3,8 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-  CrawlTriggerType,
-  CrawlStatus,
-  type CrawlConfig as ContractCrawlConfig,
   type CrawlerRunSettings as ContractCrawlerRunSettings,
-  type InputDefaultsConfig as ContractInputDefaultsConfig,
   type CodegenConfig as ContractCodegenConfig,
-  type CreateCrawlSessionRequest as ContractCreateCrawlSessionRequest,
-  type CrawlSessionData as ContractCrawlSessionData,
-  type ApplicationVersionCrawlSessionsResponse as ContractApplicationVersionCrawlSessionsResponse,
-  type CrawlSessionByIDResponse as ContractCrawlSessionByIDResponse,
-  type StopCrawlSessionResponse as ContractStopCrawlSessionResponse,
 } from "@coveritlabs/contracts";
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
 import { z } from "@utils/zod";
@@ -21,16 +12,74 @@ import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
 
 export type CrawlerRunSettings = Plain<ContractCrawlerRunSettings>;
-export type InputDefaultsConfig = Plain<ContractInputDefaultsConfig>;
-export type CrawlConfig = Plain<ContractCrawlConfig>;
+export type InputDefaultsConfig = {
+  fieldPatterns: Record<string, string>;
+  typeFallbacks: Record<string, string>;
+};
+export type CrawlConfig = {
+  maxStates?: number;
+  timeoutSeconds?: number;
+  generateTestFlows?: boolean;
+  crawlerSettings?: CrawlerRunSettings;
+  inputDefaults?: InputDefaultsConfig;
+};
 export type CodegenConfig = Plain<ContractCodegenConfig>;
-export type CreateCrawlSessionRequest = Plain<ContractCreateCrawlSessionRequest>;
-export type CrawlSessionData = Plain<ContractCrawlSessionData>;
-export type ApplicationVersionCrawlSessionsResponse = Plain<ContractApplicationVersionCrawlSessionsResponse>;
-export type CrawlSessionByIDResponse = Plain<ContractCrawlSessionByIDResponse>;
-export type StopCrawlSessionResponse = Plain<ContractStopCrawlSessionResponse>;
+export type CreateCrawlSessionRequest = {
+  triggerType: CrawlTriggerType;
+  crawlConfig?: CrawlConfig;
+  regressionCodebaseId?: string;
+  codegenConfig?: CodegenConfig;
+};
+export type CrawlSessionData = {
+  id: string;
+  appVersionId: string;
+  status: CrawlStatus;
+  triggerType: CrawlTriggerType;
+  crawlConfig: CrawlConfig;
+  regressionCodebaseId?: string;
+  codegenConfig?: CodegenConfig;
+  baseUrlSnapshot?: string;
+  scheduleId?: string;
+  stateCount: number;
+  transitionCount: number;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  errorMessage?: string;
+};
+export type ApplicationVersionCrawlSessionsResponse = {
+  sessions: CrawlSessionData[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+};
+export type CrawlSessionByIDResponse = {
+  session: CrawlSessionData;
+};
+export type StopCrawlSessionResponse = {
+  session: CrawlSessionData;
+};
 export type GetSessionsQuery = ZodInfer<typeof GetSessionsQuerySchema>;
-export { CrawlTriggerType, CrawlStatus };
+
+export enum CrawlStatus {
+  UNSPECIFIED = 0,
+  QUEUED = 1,
+  RUNNING = 2,
+  COMPLETED = 3,
+  FAILED = 4,
+  ABORTED = 5,
+  PAUSED = 6,
+  NEW = 7,
+}
+
+export enum CrawlTriggerType {
+  UNSPECIFIED = 0,
+  MANUAL = 1,
+  SCHEDULED = 2,
+  CI_TRIGGER = 3,
+  WEBHOOK = 4,
+  ON_DEMAND = 5,
+}
 
 export const CrawlerRunSettingsSchema = z.object({
   headless: z.boolean().optional(),
@@ -60,20 +109,17 @@ export const CrawlerRunSettingsSchema = z.object({
 export const InputDefaultsConfigSchema = z.object({
   fieldPatterns: z.record(z.string(), z.string()),
   typeFallbacks: z.record(z.string(), z.string()),
-}) satisfies ZodType<InputDefaultsConfig>;
+}).strict() satisfies ZodType<InputDefaultsConfig>;
 
 export const CrawlConfigSchema = z
   .object({
     maxStates: z.number().int().min(1).max(100_000).default(DEFAULT_CRAWL_CONFIG.maxStates),
-    maxDepth: z.number().int().min(1).max(1_000).default(DEFAULT_CRAWL_CONFIG.maxDepth),
-    includeUrlPatterns: z.array(z.string().min(1).max(2048)).max(100).default(DEFAULT_CRAWL_CONFIG.includeUrlPatterns),
-    excludeUrlPatterns: z.array(z.string().min(1).max(2048)).max(100).default(DEFAULT_CRAWL_CONFIG.excludeUrlPatterns),
-    enableSemanticDecisions: z.boolean().default(DEFAULT_CRAWL_CONFIG.enableSemanticDecisions),
     timeoutSeconds: z.number().int().min(1).max(86400).default(DEFAULT_CRAWL_CONFIG.timeoutSeconds),
-    crawlerSettings: CrawlerRunSettingsSchema.optional(),
+    generateTestFlows: z.boolean().default(DEFAULT_CRAWL_CONFIG.generateTestFlows),
+    crawlerSettings: CrawlerRunSettingsSchema.optional().default({}),
     inputDefaults: InputDefaultsConfigSchema.optional(),
   })
-  .loose() satisfies ZodType<CrawlConfig>;
+  .strict() satisfies ZodType<CrawlConfig>;
 
 export const CodegenConfigSchema = z.object({
   codegenBranch: z.string().min(1).max(200),

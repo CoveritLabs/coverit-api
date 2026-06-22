@@ -4,18 +4,14 @@
 
 export type CrawlConfigDefaults = {
   maxStates: number;
-  maxDepth: number;
-  includeUrlPatterns: string[];
-  excludeUrlPatterns: string[];
-  enableSemanticDecisions: boolean;
   timeoutSeconds: number;
+  generateTestFlows: boolean;
+  crawlerSettings: Record<string, never>;
 };
 
 export const DEFAULT_CRAWL_CONFIG: CrawlConfigDefaults = {
   maxStates: 1000,
-  maxDepth: 10,
-  includeUrlPatterns: [],
-  excludeUrlPatterns: [],
-  enableSemanticDecisions: false,
   timeoutSeconds: 3600,
+  generateTestFlows: true,
+  crawlerSettings: {},
 };
