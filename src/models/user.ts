@@ -4,11 +4,9 @@
 
 // User domain DTOs
 
-import type {
-    UserInfo as ContractUserInfo,
-} from '@coveritlabs/contracts';
+import type { UserInfo as ContractUserInfo } from "@coveritlabs/contracts";
 
-import type { Plain } from './common';
+import type { Plain } from "./common";
 
 // Shared domain models
 export type UserInfo = Plain<ContractUserInfo>;

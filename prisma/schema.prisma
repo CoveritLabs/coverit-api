@@ -20,6 +20,9 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   accounts Account[]
+  projectMembers ProjectMember[]
+  createdCrawlSessions CrawlSession[]
+  createdCrawlSchedules CrawlSchedule[]
 
   @@map("users")
 }
@@ -36,4 +39,461 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
+}
+
+//////////
+// Project
+//////////
+
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members ProjectMember[]
+  targetApplications TargetApplication[]
+  integrations ProjectIntegration[]
+  scenarioIntegrationReports ScenarioIntegrationReport[]
+
+  @@map("projects")
+}
+
+enum ProjectRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum CrawlStatus {
+  UNSPECIFIED
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  ABORTED
+  PAUSED
+  NEW
+}
+
+enum CrawlTriggerType {
+  UNSPECIFIED
+  MANUAL
+  SCHEDULED
+  CI_TRIGGER
+  WEBHOOK
+  ON_DEMAND
+}
+
+enum CrawlScheduleType {
+  UNSPECIFIED
+  ONCE
+  CRON
+}
+
+enum CrawlScheduleMode {
+  UNSPECIFIED
+  LATEST_VERSION
+  FIXED_VERSION
+}
+
+enum RegressionRunStatus {
+  RUNNING
+  PASSED
+  FAILED
+}
+
+enum RegressionScenarioStatus {
+  RUNNING
+  PASSED
+  FAILED
+}
+
+enum RegressionArtifactKind {
+  FAILURE
+  LOG
+  HEALING
+  SUMMARY
+  SCREENSHOT
+  VIDEO
+  TRACE
+  EVENTS
+  OTHER
+}
+
+enum RegressionArtifactUploadStatus {
+  UPLOADED
+  FAILED
+}
+
+enum ScenarioIntegrationReportStatus {
+  PENDING
+  CREATING
+  ATTACHING
+  CREATED
+  FAILED
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      ProjectRole
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+////////////////
+// Integrations
+////////////////
+
+model ProjectIntegration {
+  id                    String    @id @default(uuid()) @db.Uuid
+  projectId             String    @map("project_id") @db.Uuid
+  provider              String
+  jiraCloudId           String    @map("jira_cloud_id")
+  jiraSiteName          String?   @map("jira_site_name")
+  jiraSiteUrl           String?   @map("jira_site_url")
+  scopes                String[]  @default([])
+  tokenType             String    @map("token_type")
+  encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
+  encryptedRefreshToken String?   @map("encrypted_refresh_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  authorizedByUserId    String    @map("authorized_by_user_id") @db.Uuid
+  reportingConfig       Json?     @map("reporting_config")
+  refreshedAt           DateTime? @map("refreshed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider])
+  @@index([provider])
+  @@map("project_integrations")
+}
+
+/////////////////////
+// Target Application
+/////////////////////
+
+model TargetApplication {
+  id              String    @id @default(uuid()) @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  name            String
+  baseUrl         String    @map("base_url")
+  apiKeyHash      String?   @unique @map("api_key_hash")
+  apiKeyPreview   String?   @map("api_key_preview")
+  apiKeyCreatedAt DateTime? @map("api_key_created_at")
+  apiKeyRotatedAt DateTime? @map("api_key_rotated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions TargetApplicationVersion[]
+  regressionCodebases RegressionCodebase[]
+  crawlSchedules CrawlSchedule[]
+  regressionRuns RegressionRun[]
+
+  @@unique([projectId, name])
+  @@map("target_applications")
+}
+
+model TargetApplicationVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  targetApplicationId String   @map("target_application_id") @db.Uuid
+  version             String
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  crawlSessions CrawlSession[]
+  crawlSchedules CrawlSchedule[]
+  testFlows      TestFlow[]
+  regressionRuns RegressionRun[]
+  @@unique([targetApplicationId, version])
+  @@map("target_application_versions")
+}
+
+model RegressionRun {
+  id                  String              @id @default(uuid()) @db.Uuid
+  runId               String              @map("run_id")
+  targetApplicationId String              @map("target_application_id") @db.Uuid
+  versionId           String?             @map("version_id") @db.Uuid
+  name                String              @default("Run")
+  nameNumber          Int                 @default(1) @map("name_number")
+  status              RegressionRunStatus @default(RUNNING)
+  startedAt           DateTime?           @map("started_at")
+  finishedAt          DateTime?           @map("finished_at")
+  durationMs          Int?                @map("duration_ms")
+  passedCount         Int                 @default(0) @map("passed_count")
+  failedCount         Int                 @default(0) @map("failed_count")
+  warningCount        Int                 @default(0) @map("warning_count")
+  summary             Json?
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  version           TargetApplicationVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  scenarios         RegressionScenario[]
+  events            RegressionEvent[]
+  artifacts         RegressionArtifact[]
+  integrationReports ScenarioIntegrationReport[]
+
+  @@unique([targetApplicationId, runId])
+  @@unique([targetApplicationId, name, nameNumber])
+  @@index([targetApplicationId, versionId, createdAt])
+  @@map("regression_runs")
+}
+
+model RegressionScenario {
+  id           String                   @id @default(uuid()) @db.Uuid
+  runDbId      String                   @map("run_db_id") @db.Uuid
+  scenarioKey  String                   @map("scenario_key")
+  featureName  String?                  @map("feature_name")
+  scenarioName String?                  @map("scenario_name")
+  title        String?
+  file         String?
+  line         Int?
+  status       RegressionScenarioStatus @default(RUNNING)
+  startedAt    DateTime?                @map("started_at")
+  finishedAt   DateTime?                @map("finished_at")
+  durationMs   Int?                     @map("duration_ms")
+  passedCount  Int                      @default(0) @map("passed_count")
+  failedCount  Int                      @default(0) @map("failed_count")
+  warningCount Int                      @default(0) @map("warning_count")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+
+  run       RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  events    RegressionEvent[]
+  artifacts RegressionArtifact[]
+  integrationReports ScenarioIntegrationReport[]
+
+  @@unique([runDbId, scenarioKey])
+  @@index([runDbId, status])
+  @@map("regression_scenarios")
+}
+
+model RegressionEvent {
+  id           String   @id
+  runDbId      String   @map("run_db_id") @db.Uuid
+  scenarioId   String?  @map("scenario_id") @db.Uuid
+  type         String
+  timestamp    DateTime
+  featureName  String?  @map("feature_name")
+  scenarioName String?  @map("scenario_name")
+  stepId       String?  @map("step_id")
+  stepLabel    String?  @map("step_label")
+  stepType     String?  @map("step_type")
+  status       String?
+  logLevel     String?  @map("log_level")
+  hasFailure   Boolean  @default(false) @map("has_failure")
+  hasHealing   Boolean  @default(false) @map("has_healing")
+  payload      Json
+  raw          Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  run      RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([runDbId, timestamp])
+  @@index([scenarioId, timestamp])
+  @@index([runDbId, type, timestamp])
+  @@map("regression_events")
+}
+
+model RegressionArtifact {
+  id             String                         @id @default(uuid()) @db.Uuid
+  runDbId        String                         @map("run_db_id") @db.Uuid
+  scenarioId     String?                        @map("scenario_id") @db.Uuid
+  kind           RegressionArtifactKind
+  name           String
+  data           Json
+  contentType    String?                        @map("content_type")
+  sizeBytes      BigInt?                        @map("size_bytes")
+  storageProvider String?                       @map("storage_provider")
+  storageUri     String?                        @map("storage_uri")
+  storagePath    String?                        @map("storage_path")
+  checksumSha256 String?                        @map("checksum_sha256")
+  uploadStatus   RegressionArtifactUploadStatus? @map("upload_status")
+  uploadError    String?                        @map("upload_error") @db.Text
+  metadata       Json?
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
+
+  run      RegressionRun @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([runDbId, kind])
+  @@index([scenarioId])
+  @@index([runDbId, uploadStatus])
+  @@map("regression_artifacts")
+}
+
+model ScenarioIntegrationReport {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  projectId           String                          @map("project_id") @db.Uuid
+  runDbId             String                          @map("run_db_id") @db.Uuid
+  scenarioId          String                          @map("scenario_id") @db.Uuid
+  provider            String
+  status              ScenarioIntegrationReportStatus @default(PENDING)
+  title               String
+  description         String                          @db.Text
+  reporterUserId      String                          @map("reporter_user_id") @db.Uuid
+  reporterEmail       String                          @map("reporter_email")
+  artifactIds         String[]                        @default([]) @map("artifact_ids")
+  attachedArtifactIds String[]                        @default([]) @map("attached_artifact_ids")
+  externalIssueKey    String?                         @map("external_issue_key")
+  externalIssueUrl    String?                         @map("external_issue_url")
+  providerData        Json?                           @map("provider_data")
+  attemptCount        Int                             @default(0) @map("attempt_count")
+  lastAttemptAt       DateTime?                       @map("last_attempt_at")
+  lastError           String?                         @map("last_error") @db.Text
+  createdAt           DateTime                        @default(now()) @map("created_at")
+  updatedAt           DateTime                        @updatedAt @map("updated_at")
+
+  project  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run      RegressionRun      @relation(fields: [runDbId], references: [id], onDelete: Cascade)
+  scenario RegressionScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, provider])
+  @@index([projectId, provider, status])
+  @@index([runDbId])
+  @@index([status, updatedAt])
+  @@map("scenario_integration_reports")
+}
+
+//////////////////////
+// Regression Codebase
+//////////////////////
+
+model RegressionCodebase {
+  id                   String   @id @default(uuid()) @db.Uuid
+  targetApplicationId  String   @map("target_application_id") @db.Uuid
+  frameworkName        String   @map("framework_name")
+  repositoryUrl        String   @map("repository_url")
+  apiKey               String?  @map("api_key")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  crawlSessions CrawlSession[]
+  crawlSchedules CrawlSchedule[]
+  @@map("regression_codebases")
+  @@unique([targetApplicationId, repositoryUrl])
+}
+
+model CrawlSchedule {
+  id                   String   @id @default(uuid()) @db.Uuid
+  targetApplicationId  String   @map("target_application_id") @db.Uuid
+  creatorUserId        String   @map("creator_user_id") @db.Uuid
+  versionId            String?  @map("version_id") @db.Uuid
+  regressionCodebaseId String?  @map("regression_codebase_id") @db.Uuid
+  scheduleType         CrawlScheduleType @map("schedule_type")
+  scheduleMode         CrawlScheduleMode @map("schedule_mode")
+  cronExpression       String?  @map("cron_expression")
+  timezone             String?  @map("timezone")
+  runAt                DateTime? @map("run_at")
+  isActive             Boolean  @default(true) @map("is_active")
+  catchUp              Boolean  @default(false) @map("catch_up")
+  crawlConfig          Json     @map("crawl_config")
+  codegenConfig        Json?    @map("codegen_config")
+  nextRunAt            DateTime? @map("next_run_at")
+  lastRunAt            DateTime? @map("last_run_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  targetApplication TargetApplication @relation(fields: [targetApplicationId], references: [id], onDelete: Cascade)
+  creator User @relation(fields: [creatorUserId], references: [id], onDelete: Cascade)
+  version TargetApplicationVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  regressionCodebase RegressionCodebase? @relation(fields: [regressionCodebaseId], references: [id], onDelete: SetNull)
+  sessions CrawlSession[]
+
+  @@index([targetApplicationId, isActive])
+  @@map("crawl_schedules")
+}
+
+model CrawlSession {
+  id              String    @id @default(uuid()) @map("crawl_session_id") @db.Uuid
+  appVersionId    String    @map("app_version_id") @db.Uuid
+  creatorUserId   String    @map("creator_user_id") @db.Uuid
+  regressionCodebaseId String? @map("regression_codebase_id") @db.Uuid
+  scheduleId      String?   @map("schedule_id") @db.Uuid
+  status          CrawlStatus @default(NEW)
+  triggerType     CrawlTriggerType @map("trigger_type")
+  config          Json      
+  codegenConfig   Json?     @map("codegen_config")
+  stateCount      Int       @default(0) @map("state_count")
+  transitionCount Int       @default(0) @map("transition_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  baseUrlSnapshot String?   @map("base_url_snapshot")
+  error           String?   @db.Text
+  appVersion      TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
+  creator         User @relation(fields: [creatorUserId], references: [id], onDelete: Cascade)
+  regressionCodebase RegressionCodebase? @relation(fields: [regressionCodebaseId], references: [id], onDelete: SetNull)
+  schedule CrawlSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  testFlows     TestFlow[]
+  testFlowSteps TestFlowStep[]
+
+  @@map("crawl_sessions")
+}
+
+
+model TestFlow {
+  id                  String   @id @default(uuid()) @db.Uuid
+  crawlSessionId      String   @map("crawl_session_id") @db.Uuid
+  appVersionId        String   @map("app_version_id") @db.Uuid
+  targetStateHash     String   @map("target_state_hash")
+  checkpointStateHash String   @map("checkpoint_state_hash")
+  checkpointUrl       String   @map("checkpoint_url")
+  isClipped           Boolean  @map("is_clipped")
+  stepCount           Int      @map("step_count")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  crawlSession  CrawlSession             @relation(fields: [crawlSessionId], references: [id], onDelete: Cascade)
+  appVersion    TargetApplicationVersion @relation(fields: [appVersionId], references: [id], onDelete: Cascade)
+  compositions  TestFlowComposition[]
+
+  @@index([crawlSessionId])
+  @@index([appVersionId, targetStateHash])
+  @@map("test_flows")
+}
+
+model TestFlowStep {
+  id                 String  @id @default(uuid()) @db.Uuid
+  crawlSessionId     String  @map("crawl_session_id") @db.Uuid
+  sourceStateHash    String  @map("source_state_hash")
+  targetStateHash    String  @map("target_state_hash")
+  actionType         String  @map("action_type")
+  actionFingerprint  String  @map("action_fingerprint")
+  transition         Json
+
+  crawlSession  CrawlSession          @relation(fields: [crawlSessionId], references: [id], onDelete: Cascade)
+  compositions  TestFlowComposition[]
+
+  @@unique([crawlSessionId, actionFingerprint])
+  @@map("test_flow_steps")
+}
+
+model TestFlowComposition {
+  id         String @id @default(uuid()) @db.Uuid
+  flowId     String @map("flow_id") @db.Uuid
+  stepId     String @map("step_id") @db.Uuid
+  stepOrder  Int    @map("step_order")
+
+  flow  TestFlow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  step  TestFlowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([flowId, stepOrder])
+  @@index([flowId])
+  @@map("test_flow_compositions")
 }

@@ -2,6 +2,40 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
+describe("env module console output", () => {
+  const OLD_ENV = process.env;
+
+  afterEach(() => {
+    process.env = { ...OLD_ENV };
+    jest.resetModules();
+    jest.restoreAllMocks();
+  });
+
+  test("console.info is invoked when env vars missing", () => {
+    delete process.env.DATABASE_URL;
+    jest.resetModules();
+    const spy = jest.spyOn(console, "info").mockImplementation(() => undefined as any);
+    require("@config/env");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  test("console.info is invoked when env vars present (masked)", () => {
+    process.env.DATABASE_URL = "postgres://x";
+    process.env.GOOGLE_CLIENT_ID = "g";
+    process.env.GOOGLE_CLIENT_SECRET = "gs";
+    process.env.JWT_SECRET = "s";
+    jest.resetModules();
+    const spy = jest.spyOn(console, "info").mockImplementation(() => undefined as any);
+    require("@config/env");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+// Copyright (c) 2026 CoverIt Labs. All Rights Reserved.
+// Proprietary and confidential. Unauthorized use is strictly prohibited.
+// See LICENSE file in the project root for full license information.
+
 describe("config/env", () => {
   const originalEnv = process.env;
 
@@ -37,11 +71,11 @@ describe("config/env", () => {
     expect(env.GITHUB_CLIENT_ID).toBe("");
     expect(console.info).toHaveBeenCalled();
   });
-  
+
   test("loads provided values overriding defaults", async () => {
     process.env.PORT = "4000";
     process.env.CORS_ORIGINS = "https://a.com,https://b.com";
-    
+
     const { env } = await import("@config/env");
     expect(env.PORT).toBe(4000);
     expect(env.CORS_ORIGINS).toEqual(["https://a.com", "https://b.com"]);

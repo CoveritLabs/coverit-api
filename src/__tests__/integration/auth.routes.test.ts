@@ -50,9 +50,9 @@ import app from "../../app";
 
 const BASE = `${env.API_PREFIX}/auth`;
 
-const mockPrisma = prisma as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-const mockRedis = redis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-const mockArgon2 = argon2 as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+const mockPrisma = prisma as any;  
+const mockRedis = redis as any;  
+const mockArgon2 = argon2 as any;  
 
 describe("POST /auth/signup", () => {
   it("should return 201 on successful signup", async () => {

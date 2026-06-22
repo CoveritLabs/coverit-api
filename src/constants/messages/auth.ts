@@ -6,6 +6,10 @@
  * HTTP response message strings for the Auth domain.
  */
 export const AUTH_MESSAGES = {
+  // auth guard
+  AUTH_REQUIRED: "Authentication required",
+  ACCESS_TOKEN_INVALID: "Invalid or expired access token",
+
   // signup
   SIGNUP_SUCCESS: "Account created successfully",
   EMAIL_TAKEN: "Email already registered",
