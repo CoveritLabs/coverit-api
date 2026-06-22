@@ -220,17 +220,26 @@ def main() -> int:
             "triggerType": CRAWL_TRIGGER_ON_DEMAND,
             "crawlConfig": {
                 "maxStates": 30,
-                "maxDepth": 10,
-                "includeUrlPatterns": [],
-                "excludeUrlPatterns": [],
-                "enableSemanticDecisions": True,
                 "timeoutSeconds": 90,
+                "generateTestFlows": True,
                 "crawlerSettings": {
                     "headless": True,
-                    "maxStates": 30,
                     "maxTransitions": 20,
                     "timeoutMs": 20000,
                     "useSemanticDiversity": False,
+                },
+                "inputDefaults": {
+                    "fieldPatterns": {
+                        "email": "coverit-smoke@example.com",
+                        "password": "CoveritSmoke123!",
+                        "search": "smoke query",
+                    },
+                    "typeFallbacks": {
+                        "email": "coverit-smoke@example.com",
+                        "password": "CoveritSmoke123!",
+                        "search": "smoke query",
+                        "text": "test",
+                    },
                 },
             },
         },

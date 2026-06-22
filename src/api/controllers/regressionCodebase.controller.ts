@@ -9,8 +9,16 @@ import * as rcService from "@services/regressionCodebase.service";
 
 export async function createRegressionCodebase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { appId } = req.params;
+    const { projectId, appId } = req.params;
     const response = await rcService.createRegressionCodebase(appId, req.body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "regression_codebase.created",
+      entityType: "regression_codebase",
+      entityId: response.id,
+      message: "Configured regression codebase",
+      metadata: { applicationId: appId, repositoryUrl: req.body.repositoryUrl },
+    });
     res.status(StatusCodes.CREATED).json(response);
   } catch (err) {
     next(err);
@@ -19,8 +27,16 @@ export async function createRegressionCodebase(req: Request, res: Response, next
 
 export async function updateRegressionCodebase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { appId, codebaseId } = req.params;
+    const { projectId, appId, codebaseId } = req.params;
     const response = await rcService.updateRegressionCodebase(appId, codebaseId, req.body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "regression_codebase.updated",
+      entityType: "regression_codebase",
+      entityId: codebaseId,
+      message: "Updated regression codebase",
+      metadata: { applicationId: appId, repositoryUrl: req.body.repositoryUrl },
+    });
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
@@ -29,8 +45,16 @@ export async function updateRegressionCodebase(req: Request, res: Response, next
 
 export async function deleteRegressionCodebase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { appId, codebaseId } = req.params;
+    const { projectId, appId, codebaseId } = req.params;
     const response = await rcService.deleteRegressionCodebase(appId, codebaseId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "regression_codebase.deleted",
+      entityType: "regression_codebase",
+      entityId: codebaseId,
+      message: "Deleted regression codebase",
+      metadata: { applicationId: appId },
+    });
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
