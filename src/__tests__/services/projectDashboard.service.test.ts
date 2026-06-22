@@ -17,7 +17,6 @@ describe("projectDashboard.service", () => {
 
     mockPrisma.targetApplicationVersion = { findFirst: jest.fn() };
     mockPrisma.crawlSession = { findFirst: jest.fn(), findMany: jest.fn() };
-    mockPrisma.testFlowStep = { findMany: jest.fn() };
     mockPrisma.regressionRun = { aggregate: jest.fn(), findMany: jest.fn() };
     mockPrisma.scenarioIntegrationReport = { count: jest.fn() };
     mockPrisma.testFlow = { findMany: jest.fn() };
@@ -33,11 +32,6 @@ describe("projectDashboard.service", () => {
       targetApplication: { id: "app1", name: "Web App" },
     });
     mockPrisma.crawlSession.findFirst.mockResolvedValue({ id: "session1", transitionCount: 4, createdAt });
-    mockPrisma.testFlowStep.findMany.mockResolvedValue([
-      { actionFingerprint: "a" },
-      { actionFingerprint: "b" },
-      { actionFingerprint: "c" },
-    ]);
     mockPrisma.regressionRun.aggregate.mockResolvedValue({
       _count: { _all: 2 },
       _sum: { passedCount: 7, warningCount: 2, failedCount: 1 },
@@ -76,10 +70,12 @@ describe("projectDashboard.service", () => {
         id: "flow1",
         crawlSessionId: "session1",
         checkpointStateHash: "state-123",
-        checkpointUrl: "https://example.test",
-        isClipped: false,
+        transitionRefs: ["a", "b", "c"],
+        testFlowType: "COVERAGE",
         stepCount: 3,
         createdAt,
+        generatedAt: null,
+        modifiedAt: createdAt,
         appVersion: { id: "version1", version: "1.0.0", targetApplication: { id: "app1", name: "Web App" } },
       },
     ]);
@@ -116,7 +112,11 @@ describe("projectDashboard.service", () => {
     });
     expect(dashboard.latestRuns[0]).toEqual(expect.objectContaining({ displayName: "Run #2", status: "failed" }));
     expect(dashboard.latestCrawlSessions[0]).toEqual(expect.objectContaining({ status: "completed", triggerType: "on_demand" }));
-    expect(dashboard.latestTestFlows[0]).toEqual(expect.objectContaining({ id: "flow1", stepCount: 3 }));
+    expect(mockPrisma.testFlow.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { crawlSessionId: "session1" },
+      select: { transitionRefs: true },
+    }));
+    expect(dashboard.latestTestFlows[0]).toEqual(expect.objectContaining({ id: "flow1", stepCount: 3, checkpointUrl: "", isClipped: false }));
     expect(dashboard.recentActivities[0]).toEqual(expect.objectContaining({ actorName: "Ada" }));
   });
 

@@ -1,5 +1,5 @@
--- CreateTable
-CREATE TABLE "test_flows" (
+-- CreateTable if not exists
+CREATE TABLE IF NOT EXISTS "test_flows" (
     "id" UUID NOT NULL,
     "crawl_session_id" UUID NOT NULL,
     "app_version_id" UUID NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE "test_flows" (
 );
 
 -- CreateTable
-CREATE TABLE "test_flow_steps" (
+CREATE TABLE IF NOT EXISTS "test_flow_steps" (
     "id" UUID NOT NULL,
     "crawl_session_id" UUID NOT NULL,
     "source_state_hash" TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE "test_flow_steps" (
 );
 
 -- CreateTable
-CREATE TABLE "test_flow_compositions" (
+CREATE TABLE IF NOT EXISTS "test_flow_compositions" (
     "id" UUID NOT NULL,
     "flow_id" UUID NOT NULL,
     "step_id" UUID NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE "test_flow_compositions" (
     CONSTRAINT "test_flow_compositions_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
+-- CreateIndex if not exists
 CREATE INDEX "test_flows_crawl_session_id_idx" ON "test_flows"("crawl_session_id");
 
 -- CreateIndex

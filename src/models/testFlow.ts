@@ -7,8 +7,10 @@ import {
   type SaveAllFlowsRequest as ContractSaveAllFlowsRequest,
   type SerializedFlow as ContractSerializedFlow,
 } from "@coveritlabs/contracts";
+import { TestFlowType as PrismaTestFlowType } from "@generated/prisma/client";
+import { CodegenConfigSchema, type CodegenConfig } from "@models/crawlSession";
 import { z } from "@utils/zod";
-import type { ZodType } from "zod";
+import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
 
 type ContractFlowStepData = Plain<ContractFlowStep>;
@@ -46,3 +48,62 @@ export const SerializedFlowSchema = z.object({
 export const SaveAllFlowsBodySchema = z.object({
   flows: z.record(z.string(), z.array(SerializedFlowSchema)),
 }) satisfies ZodType<SaveAllFlowsBody>;
+
+export type TestFlowType = PrismaTestFlowType;
+export type TestFlowStatus = "NEEDS_GENERATION" | "STALE" | "GENERATED";
+
+export type ListTestFlowsQuery = ZodInfer<typeof ListTestFlowsQuerySchema>;
+export type GenerateTestFlowBody = ZodInfer<typeof GenerateTestFlowBodySchema>;
+
+export interface TestFlowCrawlSessionSummary {
+  id: string;
+  triggerType: string;
+  status: string;
+  createdAt: string;
+  finishedAt?: string | null;
+}
+
+export interface TestFlowResponse {
+  id: string;
+  crawlSessionId: string;
+  appVersionId: string;
+  appVersionName: string;
+  checkpointStateHash: string;
+  transitionRefs: string[];
+  testFlowType: TestFlowType;
+  stepCount: number;
+  status: TestFlowStatus;
+  createdAt: string;
+  generatedAt: string | null;
+  modifiedAt: string;
+  crawlSession: TestFlowCrawlSessionSummary;
+}
+
+export interface ListTestFlowsResponse {
+  flows: TestFlowResponse[];
+  nextCursor?: string | null;
+}
+
+export interface GenerateTestFlowResponse {
+  message: string;
+  flowId: string;
+  jobId: string;
+}
+
+const TestFlowTypeQuerySchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
+  z.enum(PrismaTestFlowType).optional(),
+);
+
+export const ListTestFlowsQuerySchema = z.object({
+  versionId: z.uuid().optional(),
+  sessionId: z.uuid().optional(),
+  type: TestFlowTypeQuerySchema,
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+});
+
+export const GenerateTestFlowBodySchema = z.object({
+  regressionCodebaseId: z.uuid(),
+  codegenConfig: CodegenConfigSchema,
+}) satisfies ZodType<{ regressionCodebaseId: string; codegenConfig: CodegenConfig }>;

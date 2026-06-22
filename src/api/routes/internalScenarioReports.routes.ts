@@ -8,6 +8,7 @@ import * as scenarioReportsController from "@api/controllers/scenarioReports.con
 const router = Router();
 
 router.post("/reports/scenario/claim", scenarioReportsController.claimScenarioReport);
+router.post("/reports/manual-bug", scenarioReportsController.createManualBugReport);
 router.get("/reports/scenario/:reportId/context", scenarioReportsController.getScenarioReportContext);
 router.get("/reports/scenario/:reportId/artifacts/:artifactId/download", scenarioReportsController.downloadScenarioReportArtifact);
 router.patch("/reports/scenario/:reportId", scenarioReportsController.patchScenarioReport);

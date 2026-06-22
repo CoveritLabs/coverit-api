@@ -22,6 +22,7 @@ export const InternalCodegenNotificationBodySchema = z.discriminatedUnion("statu
     noChanges: z.boolean(),
     pushed: z.boolean(),
     pullRequestUrl: z.string().nullable().optional(),
+    flowIds: z.array(z.uuid()).default([]),
   }),
   z.object({
     status: z.literal("failed"),

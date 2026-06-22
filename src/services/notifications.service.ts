@@ -15,6 +15,7 @@ import type { InternalCodegenNotificationBody } from "@models/notifications";
 import type { MessageResponse } from "@models/common";
 import { NotFoundError } from "@utils/errors";
 import { logger } from "@services/logger.service";
+import { markTestFlowsGenerated } from "@services/testFlow.service";
 
 type ScenarioReportNotificationOptions = {
   terminalFailureAttemptCount: number;
@@ -40,6 +41,10 @@ export async function notifyCodegenSession(sessionId: string, body: InternalCode
   const targetApplication = session.appVersion?.targetApplication;
   const regressionCodebase = session.regressionCodebase;
   const applicationName = targetApplication?.name ?? "Target application";
+
+  if (body.status === "generated") {
+    await markTestFlowsGenerated(session.id, body.flowIds);
+  }
 
   try {
     if (body.status === "generated") {

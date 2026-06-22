@@ -7,7 +7,12 @@ import { StatusCodes } from "http-status-codes";
 
 import { AppVersionParamsSchema } from "@models/crawlSession";
 import { getCurrentUserId } from "@api/middlewares/requireAuth";
-import { createManualSession } from "@services/manualSession.service";
+import { createManualSession, reattachManualSession } from "@services/manualSession.service";
+import { z } from "@utils/zod";
+
+const ManualSessionParamsSchema = AppVersionParamsSchema.extend({
+  sessionId: z.uuid(),
+});
 
 export const connectManualSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -15,6 +20,17 @@ export const connectManualSession = async (req: Request, res: Response, next: Ne
     const userId = getCurrentUserId(req);
     const result = await createManualSession(projectId, appId, versionId, userId);
     res.status(StatusCodes.CREATED).json(result);
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const reattachManualSessionController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { projectId, appId, versionId, sessionId } = ManualSessionParamsSchema.parse(req.params);
+    const userId = getCurrentUserId(req);
+    const result = await reattachManualSession(projectId, appId, versionId, sessionId, userId);
+    res.status(StatusCodes.OK).json(result);
   } catch (e) {
     next(e);
   }

@@ -2,66 +2,31 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
+import { env } from "@config/env";
 import redis from "@lib/redis";
+import { enqueueArqJob } from "@queues/arq";
+import type { jobConfig } from "@queues/arq";
+import { nowMs } from "@utils/date";
 
-export const crawlArqConfig = {
-  queueName: "arq:queue",
+export const crawlArqConfig: jobConfig = {
+  queueName: env.CRAWL_ARQ_QUEUE_NAME ?? "arq:queue",
   jobKeyPrefix: "arq:job:",
   resultKeyPrefix: "arq:result:",
   abortSetName: "arq:abort",
   expiresMs: Number("86400000"),
 } as const;
 
-function expiryMs(): number {
-  return Number.isFinite(crawlArqConfig.expiresMs) ? crawlArqConfig.expiresMs : 86400000;
-}
-
-function nowMs(): number {
-  return Date.now();
-}
-
-function jobPayload(functionName: string, args: unknown[]): string {
-  return JSON.stringify({
-    t: null,
-    f: functionName,
-    a: args,
-    k: {},
-    et: nowMs(),
-  });
-}
-
-async function enqueueArqJob(jobId: string, functionName: string, args: unknown[]): Promise<string> {
-  const script = `
-if redis.call("exists", KEYS[1]) == 1 or redis.call("exists", KEYS[2]) == 1 then
-  return nil
-end
-redis.call("psetex", KEYS[1], ARGV[1], ARGV[2])
-redis.call("zadd", KEYS[3], ARGV[3], ARGV[4])
-return ARGV[4]
-`;
-  const result = await redis.eval(
-    script,
-    3,
-    `${crawlArqConfig.jobKeyPrefix}${jobId}`,
-    `${crawlArqConfig.resultKeyPrefix}${jobId}`,
-    crawlArqConfig.queueName,
-    String(expiryMs()),
-    jobPayload(functionName, args),
-    String(nowMs()),
-    jobId,
-  );
-  if (!result) {
-    return jobId;
-  }
-  return String(result);
-}
+export const manualArqConfig: jobConfig = {
+  ...crawlArqConfig,
+  queueName: env.MANUAL_ARQ_QUEUE_NAME,
+} as const;
 
 export async function enqueueCrawlSession(sessionId: string): Promise<string> {
-  return enqueueArqJob(sessionId, "crawl_session", [sessionId]);
+  return enqueueArqJob(sessionId, "crawl_session", [sessionId], crawlArqConfig);
 }
 
 export async function enqueueManualRecordSession(sessionId: string): Promise<string> {
-  return enqueueArqJob(sessionId, "manual_record_session", [sessionId]);
+  return enqueueArqJob(sessionId, "manual_record_session", [sessionId], manualArqConfig);
 }
 
 export async function abortCrawlSession(sessionId: string): Promise<void> {
@@ -69,6 +34,6 @@ export async function abortCrawlSession(sessionId: string): Promise<void> {
     .multi()
     .zrem(crawlArqConfig.queueName, sessionId)
     .del(`${crawlArqConfig.jobKeyPrefix}${sessionId}`)
-    .zadd(crawlArqConfig.abortSetName, nowMs(), sessionId)
+    .zadd(crawlArqConfig.abortSetName!, nowMs(), sessionId)
     .exec();
 }

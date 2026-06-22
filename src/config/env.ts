@@ -50,6 +50,10 @@ export const env = {
   DAGSHUB_TOKEN: process.env.DAGSHUB_TOKEN ?? "",
   DAGSHUB_ARTIFACT_PREFIX: process.env.DAGSHUB_ARTIFACT_PREFIX ?? "coverit-regression-artifacts",
   REGRESSION_ARTIFACT_MAX_BYTES: parseInt(process.env.REGRESSION_ARTIFACT_MAX_BYTES ?? "104857600", 10),
+
+  // Queues
+  CRAWL_ARQ_QUEUE_NAME: process.env.CRAWL_ARQ_QUEUE_NAME ?? "arq:crawl_queue",
+  MANUAL_ARQ_QUEUE_NAME: process.env.MANUAL_ARQ_QUEUE_NAME ?? "arq:manual_queue",
 } as const;
 
 console.info("Loaded environment variables:", {
@@ -90,4 +94,6 @@ console.info("Loaded environment variables:", {
   DAGSHUB_TOKEN: env.DAGSHUB_TOKEN ? "****" : "(not set)",
   DAGSHUB_ARTIFACT_PREFIX: env.DAGSHUB_ARTIFACT_PREFIX,
   REGRESSION_ARTIFACT_MAX_BYTES: env.REGRESSION_ARTIFACT_MAX_BYTES,
+  CRAWL_ARQ_QUEUE_NAME: env.CRAWL_ARQ_QUEUE_NAME,
+  MANUAL_ARQ_QUEUE_NAME: env.MANUAL_ARQ_QUEUE_NAME,
 });
