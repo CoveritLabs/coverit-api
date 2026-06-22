@@ -16,6 +16,14 @@ export async function createSchedule(req: Request, res: Response, next: NextFunc
     const { projectId, appId } = AppParamsSchema.parse(req.params);
     const body = CreateCrawlScheduleRequestSchema.parse(req.body);
     const result = await crawlScheduleService.createSchedule(projectId, appId, getCurrentUserId(req), body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_schedule.created",
+      entityType: "crawl_schedule",
+      entityId: result.id,
+      message: "Created crawl schedule",
+      metadata: { applicationId: appId, versionId: result.versionId },
+    });
     res.status(StatusCodes.CREATED).json(result);
   } catch (err) {
     next(err);
@@ -49,6 +57,14 @@ export async function updateSchedule(req: Request, res: Response, next: NextFunc
     const { scheduleId } = z.object({ scheduleId: z.uuid() }).parse(req.params);
     const body = UpdateCrawlScheduleRequestSchema.parse(req.body);
     const result = await crawlScheduleService.updateSchedule(projectId, appId, scheduleId, body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_schedule.updated",
+      entityType: "crawl_schedule",
+      entityId: scheduleId,
+      message: "Updated crawl schedule",
+      metadata: { applicationId: appId, versionId: result.versionId },
+    });
     res.status(StatusCodes.OK).json(result);
   } catch (err) {
     next(err);
@@ -60,6 +76,14 @@ export async function deleteSchedule(req: Request, res: Response, next: NextFunc
     const { projectId, appId } = AppParamsSchema.parse(req.params);
     const { scheduleId } = z.object({ scheduleId: z.uuid() }).parse(req.params);
     const { message } = await crawlScheduleService.deleteSchedule(projectId, appId, scheduleId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_schedule.deleted",
+      entityType: "crawl_schedule",
+      entityId: scheduleId,
+      message: "Deleted crawl schedule",
+      metadata: { applicationId: appId },
+    });
     res.status(StatusCodes.OK).json({ message });
   } catch (err) {
     next(err);

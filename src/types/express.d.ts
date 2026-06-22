@@ -3,10 +3,12 @@
 // See LICENSE file in the project root for full license information.
 
 import "express-serve-static-core";
+import type { ProjectActivityInput } from "@services/projectActivity.service";
 
 declare module "express-serve-static-core" {
   interface Request {
     userId?: string;
+    recordProjectActivity?: (event: ProjectActivityInput) => void;
   }
 }
 
