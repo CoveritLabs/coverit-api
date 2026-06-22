@@ -9,18 +9,23 @@ jest.mock("@services/artifactStorage.service", () => ({ artifactStorage: { read:
 jest.mock("@services/notifications.service", () => ({
   notifyScenarioReportUpdated: jest.fn(),
 }));
+jest.mock("@queues/arq/docgenArq", () => ({
+  enqueueManualBugReport: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import { SCENARIO_REPORT_MESSAGES } from "@constants/messages";
 import { getUser } from "@services/user.service";
 import { getValidJiraAccess } from "@services/integrations.service";
 import { notifyScenarioReportUpdated } from "@services/notifications.service";
+import { enqueueManualBugReport } from "@queues/arq/docgenArq";
 import * as svc from "@services/scenarioReports.service";
 
 const mockPrisma = prisma as any;
 const mockGetUser = getUser as jest.Mock;
 const mockGetValidJiraAccess = getValidJiraAccess as jest.Mock;
 const mockNotifyScenarioReportUpdated = notifyScenarioReportUpdated as jest.Mock;
+const mockEnqueueManualBugReport = enqueueManualBugReport as jest.Mock;
 
 const now = new Date("2026-06-19T12:00:00.000Z");
 const app = { id: "app1", projectId: "p1" };
@@ -94,6 +99,19 @@ describe("scenarioReports.service", () => {
     mockPrisma.regressionArtifact.findMany.mockResolvedValue([uploadedArtifact]);
     mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(null);
     mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(report());
+    mockPrisma.regressionRun.upsert.mockResolvedValue({ ...run, id: "manual-run-db-1" });
+    mockPrisma.regressionScenario.upsert.mockResolvedValue({ ...failedScenario, id: "manual-scenario-1", runDbId: "manual-run-db-1" });
+    mockPrisma.crawlSession.findUnique.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      creatorUserId: "u1",
+      creator: { id: "u1", email: "user@example.com" },
+      appVersion: {
+        id: "version-1",
+        targetApplicationId: "app1",
+        targetApplication: { id: "app1", projectId: "p1" },
+      },
+    });
+    mockEnqueueManualBugReport.mockResolvedValue("docgen:manual-bug:job-1");
     mockGetUser.mockResolvedValue({ id: "u1", email: "user@example.com", name: "User" });
     mockGetValidJiraAccess.mockResolvedValue({
       provider: "jira",
@@ -248,5 +266,56 @@ describe("scenarioReports.service", () => {
     await svc.patchScenarioReport("report-1", { status: "created", externalIssueKey: "COV-1" });
 
     expect(mockNotifyScenarioReportUpdated).toHaveBeenCalledWith(updatedReport, { terminalFailureAttemptCount: 5 });
+  });
+
+  test("creates a manual bug report before enqueueing docgen", async () => {
+    mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(
+      report({
+        id: "manual-report-1",
+        runDbId: "manual-run-db-1",
+        scenarioId: "manual-scenario-1",
+        artifactIds: [],
+      }),
+    );
+
+    const response = await svc.createManualBugReport({
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      flowId: "22222222-2222-4222-8222-222222222222",
+      checkpointHash: "state-1",
+      transitionIds: ["transition-1"],
+      summary: "Checkout fails",
+      severity: "high",
+      currentUrl: "https://app.test/cart",
+      recordedEvents: [{ action: "click", selector: "#checkout" }],
+      provider: "jira",
+    });
+
+    expect(mockPrisma.regressionRun.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { targetApplicationId_runId: { targetApplicationId: "app1", runId: "manual-bug-11111111-1111-4111-8111-111111111111" } },
+      }),
+    );
+    expect(mockPrisma.scenarioIntegrationReport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          provider: "JIRA",
+          status: "PENDING",
+          artifactIds: [],
+          providerData: expect.objectContaining({
+            manualBug: expect.objectContaining({ flowId: "22222222-2222-4222-8222-222222222222" }),
+          }),
+        }),
+      }),
+    );
+    expect(mockEnqueueManualBugReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        report_id: "manual-report-1",
+        provider: "jira",
+        session_id: "11111111-1111-4111-8111-111111111111",
+        flow_id: "22222222-2222-4222-8222-222222222222",
+        transition_ids: ["transition-1"],
+      }),
+    );
+    expect(response).toMatchObject({ report: { id: "manual-report-1" }, jobId: "docgen:manual-bug:job-1" });
   });
 });

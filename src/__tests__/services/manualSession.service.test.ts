@@ -41,6 +41,11 @@ describe("manualSession.service", () => {
     mockPrisma.crawlSession.create.mockResolvedValue({
       id: "session1",
     });
+    mockPrisma.crawlSession.findFirst.mockResolvedValue({
+      id: "session1",
+      status: "RUNNING",
+      triggerType: "MANUAL",
+    });
     mockPrisma.crawlSession.update.mockResolvedValue({});
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.get.mockResolvedValue(null);
@@ -120,6 +125,57 @@ describe("manualSession.service", () => {
         error: "queue down",
       }),
     });
+    expect(mockRedis.set).not.toHaveBeenCalled();
+  });
+
+  test("reattaches an active manual recording by issuing a fresh ticket", async () => {
+    const result = await svc.reattachManualSession("project1", "app1", "version1", "session1", "user1");
+
+    expect(result).toEqual({ sessionId: "session1", wsTicket: "ticket-1" });
+    expect(mockPrisma.crawlSession.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "session1",
+        appVersionId: "version1",
+      },
+      select: {
+        id: true,
+        status: true,
+        triggerType: true,
+      },
+    });
+    expect(mockAddManualSessionJob).not.toHaveBeenCalled();
+    expect(mockPrisma.crawlSession.create).not.toHaveBeenCalled();
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      cacheKeys.manualSession.ticket("ticket-1"),
+      JSON.stringify({ sessionId: "session1", userId: "user1" }),
+      "EX",
+      expect.any(Number),
+    );
+  });
+
+  test("rejects reattach for terminal manual recordings", async () => {
+    mockPrisma.crawlSession.findFirst.mockResolvedValue({
+      id: "session1",
+      status: "COMPLETED",
+      triggerType: "MANUAL",
+    });
+
+    await expect(svc.reattachManualSession("project1", "app1", "version1", "session1", "user1")).rejects.toThrow(
+      "Manual session is no longer active",
+    );
+    expect(mockRedis.set).not.toHaveBeenCalled();
+  });
+
+  test("rejects reattach for non-manual sessions", async () => {
+    mockPrisma.crawlSession.findFirst.mockResolvedValue({
+      id: "session1",
+      status: "RUNNING",
+      triggerType: "ON_DEMAND",
+    });
+
+    await expect(svc.reattachManualSession("project1", "app1", "version1", "session1", "user1")).rejects.toThrow(
+      "Session is not a manual recording",
+    );
     expect(mockRedis.set).not.toHaveBeenCalled();
   });
 });

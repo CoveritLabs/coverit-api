@@ -43,6 +43,7 @@ const prisma: Record<string, any> = {
     },
     regressionRun: {
         findUnique: jest.fn(),
+        upsert: jest.fn(),
     },
     regressionCodebase: {
         findUnique: jest.fn(),
@@ -54,6 +55,7 @@ const prisma: Record<string, any> = {
     },
     regressionScenario: {
         findFirst: jest.fn(),
+        upsert: jest.fn(),
     },
     regressionArtifact: {
         findMany: jest.fn(),
@@ -64,6 +66,11 @@ const prisma: Record<string, any> = {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
+    },
+    testFlow: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
         updateMany: jest.fn(),
     },
     $connect: jest.fn(),
