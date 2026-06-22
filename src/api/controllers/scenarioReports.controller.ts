@@ -8,6 +8,7 @@ import { getCurrentUserId } from "@api/middlewares/requireAuth";
 import {
   CreateScenarioIntegrationReportBodySchema,
   InternalClaimScenarioReportBodySchema,
+  InternalCreateManualBugReportBodySchema,
   InternalPatchScenarioReportBodySchema,
 } from "@models/scenarioReports";
 import * as scenarioReportsService from "@services/scenarioReports.service";
@@ -42,6 +43,17 @@ export async function claimScenarioReport(req: Request, res: Response, next: Nex
       return;
     }
     res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createManualBugReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    scenarioReportsService.assertInternalServiceToken(req.headers["x-coverit-internal-token"]);
+    const body = InternalCreateManualBugReportBodySchema.parse(req.body);
+    const response = await scenarioReportsService.createManualBugReport(body);
+    res.status(StatusCodes.ACCEPTED).json(response);
   } catch (err) {
     next(err);
   }

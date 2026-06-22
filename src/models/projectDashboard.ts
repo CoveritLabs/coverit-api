@@ -3,36 +3,27 @@
 // See LICENSE file in the project root for full license information.
 
 import type {
-  ProjectActivity as ContractProjectActivity,
-  ProjectCoverageSummary as ContractProjectCoverageSummary,
-  ProjectDashboardResponse as ContractProjectDashboardResponse,
-  ProjectDashboardVersionRef as ContractProjectDashboardVersionRef,
-  ProjectLatestCrawlSession as ContractProjectLatestCrawlSession,
-  ProjectLatestRun as ContractProjectLatestRun,
-  ProjectLatestTestFlow as ContractProjectLatestTestFlow,
-  ProjectRunStatistics as ContractProjectRunStatistics,
+  ProjectActivity,
+  ProjectCoverageSummary,
+  ProjectDashboardResponse,
+  ProjectDashboardVersionRef,
+  ProjectLatestCrawlSession,
+  ProjectLatestRun,
+  ProjectLatestTestFlow,
+  ProjectRunStatistics,
 } from "@coveritlabs/contracts";
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
-import type { Plain } from "./common";
 
-export type ProjectDashboardVersionRef = Plain<ContractProjectDashboardVersionRef>;
-export type ProjectCoverageSummary = Plain<ContractProjectCoverageSummary>;
-export type ProjectRunStatistics = Plain<ContractProjectRunStatistics>;
-export type ProjectLatestRun = Plain<ContractProjectLatestRun>;
-export type ProjectLatestCrawlSession = Plain<ContractProjectLatestCrawlSession>;
-export type ProjectLatestTestFlow = Plain<ContractProjectLatestTestFlow>;
-export type ProjectActivity = Plain<ContractProjectActivity>;
-export type ProjectDashboardResponse = Omit<
-  Plain<ContractProjectDashboardResponse>,
-  "coverage" | "runStatistics" | "latestRuns" | "latestCrawlSessions" | "latestTestFlows" | "recentActivities"
-> & {
-  coverage: ProjectCoverageSummary;
-  runStatistics: ProjectRunStatistics;
-  latestRuns: ProjectLatestRun[];
-  latestCrawlSessions: ProjectLatestCrawlSession[];
-  latestTestFlows: ProjectLatestTestFlow[];
-  recentActivities: ProjectActivity[];
+export type {
+  ProjectActivity,
+  ProjectCoverageSummary,
+  ProjectDashboardResponse,
+  ProjectDashboardVersionRef,
+  ProjectLatestCrawlSession,
+  ProjectLatestRun,
+  ProjectLatestTestFlow,
+  ProjectRunStatistics,
 };
 
 export const ProjectDashboardQuerySchema = z.object({
@@ -46,7 +37,7 @@ export const ProjectDashboardVersionRefSchema = z.object({
   version: z.string(),
   applicationId: z.string(),
   applicationName: z.string(),
-}) satisfies ZodType<ProjectDashboardVersionRef>;
+}) satisfies ZodType<Omit<ProjectDashboardVersionRef, "$typeName">>;
 
 export const ProjectCoverageSummarySchema = z.object({
   percentage: z.number(),
@@ -54,7 +45,7 @@ export const ProjectCoverageSummarySchema = z.object({
   totalTransitions: z.number(),
   crawlSessionId: z.string().optional(),
   calculatedAt: z.string().optional(),
-}) satisfies ZodType<ProjectCoverageSummary>;
+}) satisfies ZodType<Omit<ProjectCoverageSummary, "$typeName">>;
 
 export const ProjectRunStatisticsSchema = z.object({
   passedCount: z.number(),
@@ -63,7 +54,7 @@ export const ProjectRunStatisticsSchema = z.object({
   reportedWarningCount: z.number(),
   reportedFailedCount: z.number(),
   totalRuns: z.number(),
-}) satisfies ZodType<ProjectRunStatistics>;
+}) satisfies ZodType<Omit<ProjectRunStatistics, "$typeName">>;
 
 export const ProjectLatestRunSchema = z.object({
   id: z.string(),
@@ -78,7 +69,7 @@ export const ProjectLatestRunSchema = z.object({
   warningCount: z.number(),
   failedCount: z.number(),
   createdAt: z.string(),
-}) satisfies ZodType<ProjectLatestRun>;
+}) satisfies ZodType<Omit<ProjectLatestRun, "$typeName">>;
 
 export const ProjectLatestCrawlSessionSchema = z.object({
   id: z.string(),
@@ -93,7 +84,7 @@ export const ProjectLatestCrawlSessionSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
-}) satisfies ZodType<ProjectLatestCrawlSession>;
+}) satisfies ZodType<Omit<ProjectLatestCrawlSession, "$typeName">>;
 
 export const ProjectLatestTestFlowSchema = z.object({
   id: z.string(),
@@ -107,7 +98,7 @@ export const ProjectLatestTestFlowSchema = z.object({
   isClipped: z.boolean(),
   stepCount: z.number(),
   createdAt: z.string(),
-}) satisfies ZodType<ProjectLatestTestFlow>;
+}) satisfies ZodType<Omit<ProjectLatestTestFlow, "$typeName">>;
 
 export const ProjectActivitySchema = z.object({
   id: z.string(),
@@ -120,7 +111,7 @@ export const ProjectActivitySchema = z.object({
   actorName: z.string().optional(),
   actorEmail: z.string().optional(),
   createdAt: z.string(),
-}) satisfies ZodType<ProjectActivity>;
+}) satisfies ZodType<Omit<ProjectActivity, "$typeName">>;
 
 export const ProjectDashboardResponseSchema = z.object({
   selectedVersion: ProjectDashboardVersionRefSchema.optional(),
@@ -130,4 +121,17 @@ export const ProjectDashboardResponseSchema = z.object({
   latestCrawlSessions: z.array(ProjectLatestCrawlSessionSchema),
   latestTestFlows: z.array(ProjectLatestTestFlowSchema),
   recentActivities: z.array(ProjectActivitySchema),
-}) satisfies ZodType<ProjectDashboardResponse>;
+}) satisfies ZodType<
+  Omit<
+    ProjectDashboardResponse,
+    "$typeName" | "coverage" | "runStatistics" | "selectedVersion" | "latestRuns" | "latestCrawlSessions" | "latestTestFlows" | "recentActivities"
+  > & {
+    selectedVersion?: Omit<ProjectDashboardVersionRef, "$typeName">;
+    coverage: Omit<ProjectCoverageSummary, "$typeName">;
+    runStatistics: Omit<ProjectRunStatistics, "$typeName">;
+    latestRuns: Array<Omit<ProjectLatestRun, "$typeName">>;
+    latestCrawlSessions: Array<Omit<ProjectLatestCrawlSession, "$typeName">>;
+    latestTestFlows: Array<Omit<ProjectLatestTestFlow, "$typeName">>;
+    recentActivities: Array<Omit<ProjectActivity, "$typeName">>;
+  }
+>;

@@ -11,6 +11,8 @@ import type {
   InternalScenarioReportArtifact as ContractInternalScenarioReportArtifact,
   InternalScenarioReportContextResponse as ContractInternalScenarioReportContextResponse,
   JiraScenarioIntegrationReportDetails as ContractJiraScenarioIntegrationReportDetails,
+  ManualSessionBugReportPayload as ContractManualSessionBugReportPayload,
+  ManualSessionFlowCompletedPayload as ContractManualSessionFlowCompletedPayload,
   ScenarioIntegrationReport as ContractScenarioIntegrationReport,
   ScenarioIntegrationReportResponse as ContractScenarioIntegrationReportResponse,
 } from "@coveritlabs/contracts";
@@ -39,6 +41,18 @@ export const InternalPatchScenarioReportBodySchema = z.object({
   attachedArtifactIds: z.array(z.string()).optional(),
   lastError: z.string().nullable().optional(),
   providerData: z.unknown().optional(),
+});
+
+export const InternalCreateManualBugReportBodySchema = z.object({
+  sessionId: z.uuid(),
+  flowId: z.uuid(),
+  checkpointHash: z.requiredString("checkpointHash is required"),
+  transitionIds: z.array(z.requiredString("transition id is required")).min(1),
+  summary: z.requiredString(SCENARIO_REPORT_VALIDATION.TITLE_REQUIRED).max(500),
+  severity: z.requiredString("severity is required").max(50),
+  currentUrl: z.string().max(2048).optional().default(""),
+  recordedEvents: z.array(z.unknown()).optional().default([]),
+  provider: ScenarioIntegrationReportProviderSchema.optional().default("jira"),
 });
 
 export const JiraScenarioIntegrationReportDetailsSchema = z.object({
@@ -137,6 +151,15 @@ export type InternalPatchScenarioReportBody = Omit<
   lastError?: string | null;
   providerData?: unknown;
 };
+export type InternalCreateManualBugReportBody = Omit<
+  Plain<ContractManualSessionFlowCompletedPayload>,
+  "testFlowType" | "$typeName"
+> &
+  Omit<Plain<ContractManualSessionBugReportPayload>, "includeScreenshot" | "includeSteps" | "$typeName"> & {
+    currentUrl: string;
+    recordedEvents: unknown[];
+    provider: ScenarioIntegrationReportProvider;
+  };
 
 export type JiraScenarioIntegrationReportDetails = Plain<ContractJiraScenarioIntegrationReportDetails>;
 

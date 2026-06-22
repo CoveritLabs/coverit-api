@@ -10,5 +10,6 @@ import { requireProjectMember } from "@api/middlewares/requireProjectAccess";
 const router = Router({ mergeParams: true });
 
 router.post("/connect", requireProjectMember, manualSessionController.connectManualSession);
+router.post("/:sessionId/reattach", requireProjectMember, manualSessionController.reattachManualSessionController);
 
 export default router;

@@ -30,13 +30,20 @@ type SessionSockets = {
 const MANUAL_SESSION_SOCKET_MESSAGE_TYPES = {
   "browser.input": ManualSessionSocketMessageType.BROWSER_INPUT,
   "flow.start": ManualSessionSocketMessageType.FLOW_START,
+  "flow.finish": ManualSessionSocketMessageType.UNSPECIFIED,
+  "flow.rewind": ManualSessionSocketMessageType.UNSPECIFIED,
+  "bug.report": ManualSessionSocketMessageType.UNSPECIFIED,
   "session.disconnect": ManualSessionSocketMessageType.SESSION_DISCONNECT,
   "crawler.ready": ManualSessionSocketMessageType.CRAWLER_READY,
   "session.status": ManualSessionSocketMessageType.SESSION_STATUS,
   "browser.frame": ManualSessionSocketMessageType.BROWSER_FRAME,
   "browser.navigation": ManualSessionSocketMessageType.BROWSER_NAVIGATION,
   "recorded.event": ManualSessionSocketMessageType.RECORDED_EVENT,
+  "recorded.step": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.started": ManualSessionSocketMessageType.FLOW_STARTED,
+  "flow.completed": ManualSessionSocketMessageType.UNSPECIFIED,
+  "flow.rewound": ManualSessionSocketMessageType.UNSPECIFIED,
+  "bug.reported": ManualSessionSocketMessageType.UNSPECIFIED,
   "session.closed": ManualSessionSocketMessageType.SESSION_CLOSED,
   error: ManualSessionSocketMessageType.ERROR,
 } as const;
@@ -65,14 +72,25 @@ type WsMessage = Omit<ManualSessionSocketMessageContract, "type" | "status" | "r
   [key: string]: unknown;
 };
 
-const FRONTEND_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>(["browser.input", "flow.start", "session.disconnect"]);
+const FRONTEND_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>([
+  "browser.input",
+  "flow.start",
+  "flow.finish",
+  "flow.rewind",
+  "bug.report",
+  "session.disconnect",
+]);
 const CRAWLER_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>([
   "crawler.ready",
   "session.status",
   "browser.frame",
   "browser.navigation",
   "recorded.event",
+  "recorded.step",
   "flow.started",
+  "flow.completed",
+  "flow.rewound",
+  "bug.reported",
   "session.closed",
   "error",
 ]);
