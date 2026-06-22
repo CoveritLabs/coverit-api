@@ -21,6 +21,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/coverit}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - CRAWL_ARQ_QUEUE_NAME=${CRAWL_ARQ_QUEUE_NAME:-arq:queue}
+      - MANUAL_ARQ_QUEUE_NAME=${MANUAL_ARQ_QUEUE_NAME:-arq:manual-recordings}
       - CRAWL_ARQ_EXPIRES_MS=${CRAWL_ARQ_EXPIRES_MS:-86400000}
       - JWT_SECRET=${JWT_SECRET:-}
       - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-}

@@ -40,6 +40,7 @@ const MANUAL_SESSION_SOCKET_MESSAGE_TYPES = {
   "browser.navigation": ManualSessionSocketMessageType.BROWSER_NAVIGATION,
   "recorded.event": ManualSessionSocketMessageType.RECORDED_EVENT,
   "recorded.step": ManualSessionSocketMessageType.UNSPECIFIED,
+  "session.ttl": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.started": ManualSessionSocketMessageType.FLOW_STARTED,
   "flow.completed": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.rewound": ManualSessionSocketMessageType.UNSPECIFIED,
@@ -87,6 +88,7 @@ const CRAWLER_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>([
   "browser.navigation",
   "recorded.event",
   "recorded.step",
+  "session.ttl",
   "flow.started",
   "flow.completed",
   "flow.rewound",
@@ -219,9 +221,7 @@ function attachSocket(sessionId: string, role: ClientRole, ws: WebSocket): void 
       current.crawlerReady = true;
     }
 
-    if (
-      !CRAWLER_MESSAGE_TYPES.has(message.type)
-    ) {
+    if (!CRAWLER_MESSAGE_TYPES.has(message.type)) {
       return;
     }
 
