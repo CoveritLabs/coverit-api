@@ -5,6 +5,8 @@
 import { Router } from "express";
 
 import * as projectController from "@api/controllers/project.controller";
+import * as projectDashboardController from "@api/controllers/projectDashboard.controller";
+import { projectActivityRecorder } from "@api/middlewares/projectActivity";
 import { requireAuth } from "@api/middlewares/requireAuth";
 import { requireProjectAdmin, requireProjectMembership } from "@api/middlewares/requireProjectAccess";
 import { validateBody } from "@api/middlewares/validate";
@@ -21,11 +23,13 @@ import integrationsRoutes from "@api/routes/integrations.routes";
 const router = Router();
 
 router.use(requireAuth);
+router.use(projectActivityRecorder);
 
 router.post("/", validateBody(CreateProjectRequestSchema), projectController.createProject);
 router.put("/:projectId", requireProjectAdmin, validateBody(UpdateProjectRequestSchema), projectController.updateProject);
 router.delete("/:projectId", requireProjectAdmin, projectController.deleteProject);
 router.get("/", projectController.getProjects);
+router.get("/:projectId/dashboard", requireProjectMembership, projectDashboardController.getProjectDashboard);
 router.get("/:projectId", requireProjectMembership, projectController.getProject);
 
 // Member management

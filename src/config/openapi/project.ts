@@ -11,6 +11,7 @@ import {
   RemoveMembersRequestSchema,
   UpdateMemberRequestSchema,
 } from "@models/project";
+import { ProjectDashboardResponseSchema } from "@models/projectDashboard";
 
 const MessageResponseSchema = z.object({ message: z.string() });
 const ErrorResponseSchema = z.object({ message: z.string() });
@@ -20,6 +21,7 @@ const MemberSchema = z.object({ user: UserInfoSchema.optional(), role: z.string(
 const ProjectResponseSchema = z.object({ id: z.string(), name: z.string(), description: z.string().optional(), members: z.array(MemberSchema) });
 
 registry.register("ProjectResponse", ProjectResponseSchema);
+registry.register("ProjectDashboardResponse", ProjectDashboardResponseSchema);
 
 registry.registerPath({
   method: "post",
@@ -85,6 +87,23 @@ registry.registerPath({
   parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string" } }],
   responses: {
     200: { description: "Project details", content: { "application/json": { schema: ProjectResponseSchema } } },
+    403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/projects/{projectId}/dashboard",
+  tags: ["Project"],
+  summary: "Get project dashboard statistics",
+  security: [{ bearerAuth: [] }],
+  parameters: [
+    { name: "projectId", in: "path", required: true, schema: { type: "string" } },
+    { name: "versionId", in: "query", required: false, schema: { type: "string" } },
+  ],
+  responses: {
+    200: { description: "Project dashboard statistics", content: { "application/json": { schema: ProjectDashboardResponseSchema } } },
     403: { description: "Forbidden", content: { "application/json": { schema: ErrorResponseSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
   },

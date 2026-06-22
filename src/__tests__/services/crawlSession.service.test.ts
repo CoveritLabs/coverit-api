@@ -6,6 +6,7 @@ jest.mock("@lib/prisma", () => require("../mocks/prisma"));
 jest.mock("@queues/crawl.queue", () => ({ addCrawlJob: jest.fn(), removeCrawlJob: jest.fn() }));
 
 import prisma from "@lib/prisma";
+import { TEST_FLOW_GENERATION_MAX_TF } from "@constants/crawlConfig";
 import { CrawlTriggerType } from "@models/crawlSession";
 import * as svc from "@services/crawlSession.service";
 
@@ -38,23 +39,67 @@ describe("crawlSession.service", () => {
   });
 
   test("persists creator user id when creating a crawl session", async () => {
-    await svc.createSession("p1", "app1", "v1", "creator-1", {
+    mockPrisma.crawlSession.create.mockImplementationOnce(async ({ data }: any) => ({
+      id: "s1",
+      appVersionId: "v1",
+      status: "NEW",
+      triggerType: "ON_DEMAND",
+      config: data.config,
+      codegenConfig: null,
+      regressionCodebaseId: data.regressionCodebaseId,
+      baseUrlSnapshot: data.baseUrlSnapshot,
+      scheduleId: null,
+      stateCount: 0,
+      transitionCount: 0,
+      createdAt: now,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+    }));
+
+    const result = await svc.createSession("p1", "app1", "v1", "creator-1", {
       triggerType: CrawlTriggerType.ON_DEMAND,
       regressionCodebaseId: "cb1",
       crawlConfig: {
         maxStates: 10,
-        maxDepth: 3,
-        includeUrlPatterns: [],
-        excludeUrlPatterns: [],
-        enableSemanticDecisions: false,
         timeoutSeconds: 60,
+        generateTestFlows: true,
+        testFlowGeneration: {
+          coveragePercentage: 80,
+          numOfTf: TEST_FLOW_GENERATION_MAX_TF + 500,
+          numOfStates: 12,
+          minNumOfStatesPerTf: 4,
+        },
+        crawlerSettings: {
+          useSemanticDiversity: false,
+        },
       },
     });
 
     expect(mockPrisma.crawlSession.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         creatorUserId: "creator-1",
+        config: expect.objectContaining({
+          maxStates: 10,
+          timeoutSeconds: 60,
+          generateTestFlows: true,
+          testFlowGeneration: expect.objectContaining({
+            coverage_percentage: 80,
+            num_of_tf: TEST_FLOW_GENERATION_MAX_TF,
+            num_of_states: 12,
+            min_num_of_states_per_tf: 4,
+          }),
+          crawlerSettings: expect.objectContaining({
+            use_semantic_diversity: false,
+          }),
+        }),
       }),
     }));
+    expect(result.crawlConfig.testFlowGeneration).toEqual({
+      coveragePercentage: 80,
+      numOfTf: TEST_FLOW_GENERATION_MAX_TF,
+      numOfStates: 12,
+      minNumOfStatesPerTf: 4,
+    });
   });
 });

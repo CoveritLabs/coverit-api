@@ -18,6 +18,14 @@ export async function createScenarioReport(req: Request, res: Response, next: Ne
     const userId = getCurrentUserId(req);
     const body = CreateScenarioIntegrationReportBodySchema.parse(req.body);
     const response = await scenarioReportsService.createScenarioReport(projectId, appId, runId, scenarioId, provider, userId, body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "scenario_report.created",
+      entityType: "scenario_integration_report",
+      entityId: response.report.id,
+      message: `Created ${provider} scenario report`,
+      metadata: { applicationId: appId, runId, scenarioId, provider },
+    });
     res.status(StatusCodes.ACCEPTED).json(response);
   } catch (err) {
     next(err);
