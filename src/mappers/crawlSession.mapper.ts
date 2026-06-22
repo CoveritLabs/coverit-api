@@ -43,6 +43,7 @@ export const fromDbCrawlTriggerType = <TDbTriggerType extends string>(triggerTyp
 export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonValue => {
   const settings = config.crawlerSettings as (NonNullable<CrawlConfig["crawlerSettings"]> & SemanticCrawlerSettings) | undefined;
   const input = config.inputDefaults;
+  const generation = config.testFlowGeneration;
 
   const crawlerSettings: Record<string, Prisma.InputJsonValue> = {};
   if (settings?.headless !== undefined) crawlerSettings.headless = settings.headless;
@@ -78,6 +79,14 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
   if (config.maxStates !== undefined) persisted.maxStates = config.maxStates;
   if (config.timeoutSeconds !== undefined) persisted.timeoutSeconds = config.timeoutSeconds;
   if (config.generateTestFlows !== undefined) persisted.generateTestFlows = config.generateTestFlows;
+  if (generation) {
+    persisted.testFlowGeneration = {
+      coverage_percentage: generation.coveragePercentage,
+      num_of_tf: generation.numOfTf,
+      num_of_states: generation.numOfStates,
+      min_num_of_states_per_tf: generation.minNumOfStatesPerTf,
+    };
+  }
   if (Object.keys(crawlerSettings).length > 0) persisted.crawlerSettings = crawlerSettings;
   if (input) {
     persisted.inputDefaults = {
@@ -97,6 +106,7 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
   const persisted = readObject(value);
   const settings = readObject(persisted.crawlerSettings);
   const input = readObject(persisted.inputDefaults);
+  const generation = readObject(persisted.testFlowGeneration ?? persisted.test_flow_generation);
 
   const crawlerSettings = {
     headless: settings.headless,
@@ -127,6 +137,22 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
     maxStates: persisted.maxStates ?? persisted.max_states ?? defaults.maxStates,
     timeoutSeconds: persisted.timeoutSeconds ?? persisted.timeout_seconds ?? defaults.timeoutSeconds,
     generateTestFlows: persisted.generateTestFlows ?? persisted.generate_test_flows ?? defaults.generateTestFlows,
+    testFlowGeneration:
+      Object.keys(generation).length > 0
+        ? {
+            coveragePercentage:
+              generation.coverage_percentage ??
+              generation.coveragePercentage ??
+              readObject(defaults.testFlowGeneration).coveragePercentage,
+            numOfTf: generation.num_of_tf ?? generation.numOfTf ?? readObject(defaults.testFlowGeneration).numOfTf,
+            numOfStates:
+              generation.num_of_states ?? generation.numOfStates ?? readObject(defaults.testFlowGeneration).numOfStates,
+            minNumOfStatesPerTf:
+              generation.min_num_of_states_per_tf ??
+              generation.minNumOfStatesPerTf ??
+              readObject(defaults.testFlowGeneration).minNumOfStatesPerTf,
+          }
+        : (defaults.testFlowGeneration as CrawlConfig["testFlowGeneration"]),
     crawlerSettings,
     inputDefaults:
       Object.keys(input).length > 0

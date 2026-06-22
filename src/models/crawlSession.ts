@@ -6,7 +6,7 @@ import {
   type CrawlerRunSettings as ContractCrawlerRunSettings,
   type CodegenConfig as ContractCodegenConfig,
 } from "@coveritlabs/contracts";
-import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
+import { DEFAULT_CRAWL_CONFIG, TEST_FLOW_GENERATION_MAX_TF } from "@constants/crawlConfig";
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
@@ -20,8 +20,15 @@ export type CrawlConfig = {
   maxStates?: number;
   timeoutSeconds?: number;
   generateTestFlows?: boolean;
+  testFlowGeneration?: TestFlowGenerationConfig;
   crawlerSettings?: CrawlerRunSettings;
   inputDefaults?: InputDefaultsConfig;
+};
+export type TestFlowGenerationConfig = {
+  coveragePercentage?: number;
+  numOfTf?: number;
+  numOfStates?: number;
+  minNumOfStatesPerTf?: number;
 };
 export type CodegenConfig = Plain<ContractCodegenConfig>;
 export type CreateCrawlSessionRequest = {
@@ -111,11 +118,31 @@ export const InputDefaultsConfigSchema = z.object({
   typeFallbacks: z.record(z.string(), z.string()),
 }).strict() satisfies ZodType<InputDefaultsConfig>;
 
+export const TestFlowGenerationConfigSchema = z
+  .object({
+    coveragePercentage: z.number().min(0).max(100).default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.coveragePercentage),
+    numOfTf: z
+      .number()
+      .int()
+      .min(1)
+      .transform((value) => Math.min(TEST_FLOW_GENERATION_MAX_TF, value))
+      .default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.numOfTf),
+    numOfStates: z.number().int().min(1).max(100_000).default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.numOfStates),
+    minNumOfStatesPerTf: z
+      .number()
+      .int()
+      .min(1)
+      .max(100_000)
+      .default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.minNumOfStatesPerTf),
+  })
+  .strict() satisfies ZodType<TestFlowGenerationConfig>;
+
 export const CrawlConfigSchema = z
   .object({
     maxStates: z.number().int().min(1).max(100_000).default(DEFAULT_CRAWL_CONFIG.maxStates),
     timeoutSeconds: z.number().int().min(1).max(86400).default(DEFAULT_CRAWL_CONFIG.timeoutSeconds),
     generateTestFlows: z.boolean().default(DEFAULT_CRAWL_CONFIG.generateTestFlows),
+    testFlowGeneration: TestFlowGenerationConfigSchema.optional().default(() => ({ ...DEFAULT_CRAWL_CONFIG.testFlowGeneration })),
     crawlerSettings: CrawlerRunSettingsSchema.optional().default({}),
     inputDefaults: InputDefaultsConfigSchema.optional(),
   })
