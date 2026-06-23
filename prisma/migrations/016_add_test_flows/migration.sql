@@ -50,3 +50,13 @@ CREATE INDEX "test_flow_compositions_flow_id_idx" ON "test_flow_compositions"("f
 
 -- CreateIndex
 CREATE UNIQUE INDEX "test_flow_compositions_flow_id_step_order_key" ON "test_flow_compositions"("flow_id", "step_order");
+
+ALTER TABLE "test_flows" ADD CONSTRAINT "test_flows_crawl_session_id_fkey" FOREIGN KEY ("crawl_session_id") REFERENCES "crawl_sessions"("crawl_session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "test_flows" ADD CONSTRAINT "test_flows_app_version_id_fkey" FOREIGN KEY ("app_version_id") REFERENCES "target_application_versions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "test_flow_steps" ADD CONSTRAINT "test_flow_steps_crawl_session_id_fkey" FOREIGN KEY ("crawl_session_id") REFERENCES "crawl_sessions"("crawl_session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "test_flow_compositions" ADD CONSTRAINT "test_flow_compositions_flow_id_fkey" FOREIGN KEY ("flow_id") REFERENCES "test_flows"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "test_flow_compositions" ADD CONSTRAINT "test_flow_compositions_step_id_fkey" FOREIGN KEY ("step_id") REFERENCES "test_flow_steps"("id") ON DELETE CASCADE ON UPDATE CASCADE;
