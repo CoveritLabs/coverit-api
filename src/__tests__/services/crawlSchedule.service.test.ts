@@ -48,6 +48,8 @@ describe("crawlSchedule.service", () => {
         timeoutSeconds: 60,
         generateTestFlows: true,
         crawlerSettings: {
+          maxElementsPerState: 50,
+          maxActionRepeatsPerUrl: 10,
           useSemanticDiversity: false,
         },
       },
@@ -61,6 +63,8 @@ describe("crawlSchedule.service", () => {
           timeoutSeconds: 60,
           generateTestFlows: true,
           crawlerSettings: expect.objectContaining({
+            max_elements_per_state: 50,
+            max_action_repeats_per_url: 10,
             use_semantic_diversity: false,
           }),
         }),
