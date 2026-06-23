@@ -8,6 +8,7 @@ jest.mock("@queues/crawl.queue", () => ({ addCrawlJob: jest.fn(), removeCrawlJob
 import prisma from "@lib/prisma";
 import { TEST_FLOW_GENERATION_MAX_TF } from "@constants/crawlConfig";
 import { CrawlTriggerType } from "@models/crawlSession";
+import { addCrawlJob } from "@queues/crawl.queue";
 import * as svc from "@services/crawlSession.service";
 
 const mockPrisma = prisma as any;
@@ -71,35 +72,70 @@ describe("crawlSession.service", () => {
           minNumOfStatesPerTf: 4,
         },
         crawlerSettings: {
+          maxElementsPerState: 50,
+          maxActionRepeatsPerUrl: 10,
           useSemanticDiversity: false,
         },
       },
     });
 
-    expect(mockPrisma.crawlSession.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        creatorUserId: "creator-1",
-        config: expect.objectContaining({
-          maxStates: 10,
-          timeoutSeconds: 60,
-          generateTestFlows: true,
-          testFlowGeneration: expect.objectContaining({
-            coverage_percentage: 80,
-            num_of_tf: TEST_FLOW_GENERATION_MAX_TF,
-            num_of_states: 12,
-            min_num_of_states_per_tf: 4,
-          }),
-          crawlerSettings: expect.objectContaining({
-            use_semantic_diversity: false,
+    expect(mockPrisma.crawlSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          creatorUserId: "creator-1",
+          config: expect.objectContaining({
+            maxStates: 10,
+            timeoutSeconds: 60,
+            generateTestFlows: true,
+            testFlowGeneration: expect.objectContaining({
+              coverage_percentage: 80,
+              num_of_tf: TEST_FLOW_GENERATION_MAX_TF,
+              num_of_states: 12,
+              min_num_of_states_per_tf: 4,
+            }),
+            crawlerSettings: expect.objectContaining({
+              max_elements_per_state: 50,
+              max_action_repeats_per_url: 10,
+              use_semantic_diversity: false,
+            }),
           }),
         }),
       }),
-    }));
+    );
     expect(result.crawlConfig.testFlowGeneration).toEqual({
       coveragePercentage: 80,
       numOfTf: TEST_FLOW_GENERATION_MAX_TF,
       numOfStates: 12,
       minNumOfStatesPerTf: 4,
     });
+    expect(result.crawlConfig.crawlerSettings).toEqual(
+      expect.objectContaining({
+        maxElementsPerState: 50,
+        maxActionRepeatsPerUrl: 10,
+        useSemanticDiversity: false,
+      }),
+    );
+  });
+
+  test("resume paused crawl session marks running and enqueues a worker job", async () => {
+    mockPrisma.crawlSession.findFirst.mockResolvedValueOnce({
+      id: "s1",
+      appVersionId: "v1",
+      status: "PAUSED",
+      triggerType: "ON_DEMAND",
+    });
+    mockPrisma.crawlSession.updateMany.mockResolvedValueOnce({ count: 1 });
+    (addCrawlJob as jest.Mock).mockResolvedValueOnce("s1");
+
+    const result = await svc.startSession("p1", "app1", "v1", "s1");
+
+    expect(mockPrisma.crawlSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "s1", status: "PAUSED" },
+        data: { status: "RUNNING", finishedAt: null, error: null },
+      }),
+    );
+    expect(addCrawlJob).toHaveBeenCalledWith("s1");
+    expect(result).toEqual({ message: "Crawl session resumed successfully" });
   });
 });
