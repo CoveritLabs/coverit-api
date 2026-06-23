@@ -23,3 +23,9 @@ export async function enqueueManualBugReport(payload: Record<string, unknown>): 
   const jobId = `docgen:manual-bug:${randomUUID()}`;
   return enqueueArqJob(jobId, "task_generate_manual_bug_report", [payload], docgenArqConfig);
 }
+
+export async function enqueueUserGuidesGeneration(payload: Record<string, unknown>): Promise<string> {
+  const jobId = `docgen:user-guides:${randomUUID()}`;
+  return enqueueArqJob(jobId, "task_generate_user_guide", [payload], docgenArqConfig);
+}
+

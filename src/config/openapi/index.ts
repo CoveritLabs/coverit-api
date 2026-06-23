@@ -9,6 +9,7 @@ import "./crawlSession";
 import "./crawlSchedule";
 import "./regressionRun";
 import "./integrations";
+import "./userGuides";
 import { registry } from "./registry";
 
 registry.registerComponent("securitySchemes", "bearerAuth", {

@@ -7,6 +7,7 @@ import { createServer } from "http";
 import app from "./app";
 import prisma from "@lib/prisma";
 import redis from "@lib/redis";
+import { verifyNeo4jConnection } from "@lib/neo4j";
 import { env } from "@config/env";
 import { setupManualSessionWebSockets } from "./ws/manualSessionBroker";
 
@@ -28,6 +29,16 @@ async function startServer(): Promise<void> {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Redis connection error:", message);
+    process.exit(1);
+  }
+
+  console.info("Connecting to Neo4j...");
+  try {
+    await verifyNeo4jConnection();
+    console.info("Neo4j connected");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Neo4j connection error:", message);
     process.exit(1);
   }
 

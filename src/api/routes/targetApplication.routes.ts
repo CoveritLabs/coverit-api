@@ -18,6 +18,7 @@ import manualSessionRoutes from "@api/routes/manualSession.routes";
 import regressionCodebaseRoutes from "@api/routes/regressionCodebase.routes";
 import regressionRunRoutes from "@api/routes/regressionRun.routes";
 import testFlowRoutes from "@api/routes/testFlow.routes";
+import userGuidesRoutes from "@api/routes/userGuides.routes";
 
 const router = Router({ mergeParams: true });
 
@@ -50,5 +51,8 @@ router.use("/:appId/regression-codebases", regressionCodebaseRoutes);
 
 // Regression runs and artifacts
 router.use("/:appId/runs", regressionRunRoutes);
+
+// User Guides
+router.use("/:appId/versions/:versionId", userGuidesRoutes);
 
 export default router;
