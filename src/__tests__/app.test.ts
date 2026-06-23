@@ -47,6 +47,8 @@ describe("app.ts", () => {
     expect(res.body.openapi).toBeDefined();
     expect(res.body.info).toBeDefined();
     expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/crawl-sessions");
+    expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/crawl-sessions/{crawlSessionId}/states");
+    expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/crawl-sessions/{crawlSessionId}/generate");
     expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/crawl-schedules");
   });
 

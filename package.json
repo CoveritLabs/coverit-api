@@ -43,6 +43,7 @@
         "ioredis": "^5.10.0",
         "jsonwebtoken": "^9.0.3",
         "multer": "^2.2.0",
+        "neo4j-driver": "^5.28.3",
         "pg": "^8.20.0",
         "pino": "^10.3.1",
         "pino-http": "^11.0.0",
