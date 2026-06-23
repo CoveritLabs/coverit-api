@@ -9,7 +9,7 @@ import { env } from "@config/env";
 const neo4jUri = env.NEO4J_URI ?? "bolt://localhost:7687";
 const neo4jUser = env.NEO4J_USER ?? "neo4j";
 const neo4jPassword = env.NEO4J_PASSWORD ?? "";
-console.info(env.NEO4J_USER);
+
 const driver: Driver = neo4j.driver(neo4jUri, neo4j.auth.basic(neo4jUser, neo4jPassword), {
   maxConnectionPoolSize: 20,
 });

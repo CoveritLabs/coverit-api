@@ -14,9 +14,17 @@ const router = Router({ mergeParams: true });
 
 router.use(requireAuth);
 
-router.get("/:crawlSessionId/states", requireProjectMembership, guidesController.getUserGuideStates);
+router.get("/user-guide-states", requireProjectMembership, guidesController.getUserGuideStatesForVersion);
 router.post(
-  "/:crawlSessionId/generate",
+  "/generate-user-guide",
+  requireProjectMembership,
+  validateBody(GenerateUserGuidesBodySchema),
+  guidesController.generateUserGuidesForVersion,
+);
+
+router.get("/crawl-sessions/:crawlSessionId/states", requireProjectMembership, guidesController.getUserGuideStates);
+router.post(
+  "/crawl-sessions/:crawlSessionId/generate",
   requireProjectMembership,
   validateBody(GenerateUserGuidesBodySchema),
   guidesController.generateUserGuides,

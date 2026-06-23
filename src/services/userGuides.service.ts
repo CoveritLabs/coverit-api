@@ -12,8 +12,8 @@ import type {
   UserGuideStatesResponse,
 } from "@models/userGuides";
 import { docgenArqConfig, enqueueUserGuidesGeneration } from "@queues/arq/docgenArq";
-import { getSessionDetails } from "@services/crawlSession.service";
-import { BadRequestError } from "@utils/errors";
+import { getSessionDetails, getSessions } from "@services/crawlSession.service";
+import { BadRequestError, NotFoundError } from "@utils/errors";
 
 const USER_GUIDES_RESULT_TIMEOUT_MS = 30_000;
 const USER_GUIDES_RESULT_POLL_MS = 1_000;
@@ -84,6 +84,17 @@ async function waitForArqResult(jobId: string, timeoutMs = USER_GUIDES_RESULT_TI
   throw new Error("User guide generation timed out");
 }
 
+async function getLatestSessionIdForVersion(projectId: string, appId: string, versionId: string): Promise<string> {
+  const { sessions } = await getSessions(projectId, appId, versionId, { page: 1, pageSize: 1 });
+  const latestSessionId = sessions[0]?.id;
+
+  if (!latestSessionId) {
+    throw new NotFoundError("No crawl session found for this version");
+  }
+
+  return latestSessionId;
+}
+
 export async function getUserGuideStates(projectId: string, appId: string, versionId: string, sessionId: string): Promise<UserGuideStatesResponse> {
   await getSessionDetails(projectId, appId, versionId, sessionId);
 
@@ -95,10 +106,10 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
         `
         MATCH (s:State {session_id: $sessionId})
         WHERE s.state_hash IS NOT NULL
-        WITH s, coalesce(s.label, s.title, s.url, s.state_hash) AS displayLabel
+        WITH s, coalesce(s.name, s.label, s.title, s.url, s.state_hash) AS displayLabel
         RETURN
           s.state_hash AS stateHash,
-          s.name AS label,
+          coalesce(s.name, s.label) AS label,
           s.url AS url,
           s.title AS title
         ORDER BY toString(s.first_seen) ASC, displayLabel ASC
@@ -116,6 +127,11 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
   } finally {
     await neo4jSession.close();
   }
+}
+
+export async function getUserGuideStatesForVersion(projectId: string, appId: string, versionId: string): Promise<UserGuideStatesResponse> {
+  const sessionId = await getLatestSessionIdForVersion(projectId, appId, versionId);
+  return getUserGuideStates(projectId, appId, versionId, sessionId);
 }
 
 export async function generateUserGuide(
@@ -148,10 +164,20 @@ export async function generateUserGuide(
   const jobId = await enqueueUserGuidesGeneration(payload);
   const result = await waitForArqResult(jobId);
   const userGuide = result.userGuide ?? "";
-  console.info(result);
+
   return {
     message: `User guide generation ${result.status}`,
     userGuide: userGuide || "Guide generation failed",
     error: result.lastError,
   };
+}
+
+export async function generateUserGuideForVersion(
+  projectId: string,
+  appId: string,
+  versionId: string,
+  input: GenerateUserGuidesBody,
+): Promise<GenerateUserGuidesResponse> {
+  const sessionId = await getLatestSessionIdForVersion(projectId, appId, versionId);
+  return generateUserGuide(projectId, appId, versionId, sessionId, input);
 }

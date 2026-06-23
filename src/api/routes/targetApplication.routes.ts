@@ -53,6 +53,6 @@ router.use("/:appId/regression-codebases", regressionCodebaseRoutes);
 router.use("/:appId/runs", regressionRunRoutes);
 
 // User Guides
-router.use("/:appId/versions/:versionId/crawl-sessions", userGuidesRoutes);
+router.use("/:appId/versions/:versionId", userGuidesRoutes);
 
 export default router;

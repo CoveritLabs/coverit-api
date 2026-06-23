@@ -4,7 +4,9 @@
 
 jest.mock("@services/userGuides.service", () => ({
   getUserGuideStates: jest.fn(),
+  getUserGuideStatesForVersion: jest.fn(),
   generateUserGuide: jest.fn(),
+  generateUserGuideForVersion: jest.fn(),
 }));
 
 import * as controller from "@api/controllers/userGuides.controller";
@@ -17,9 +19,9 @@ const crawlSessionId = "44444444-4444-4444-8444-444444444444";
 const startStateHash = "a".repeat(64);
 const endStateHash = "b".repeat(64);
 
-function makeReq(body: Record<string, unknown> = {}) {
+function makeReq(body: Record<string, unknown> = {}, includeSession = true) {
   return {
-    params: { projectId, appId, versionId, crawlSessionId },
+    params: includeSession ? { projectId, appId, versionId, crawlSessionId } : { projectId, appId, versionId },
     body,
   } as any;
 }
@@ -33,6 +35,18 @@ function makeRes() {
 describe("userGuides.controller", () => {
   beforeEach(() => jest.resetAllMocks());
 
+  test("getUserGuideStatesForVersion returns latest version-session states", async () => {
+    (svc.getUserGuideStatesForVersion as jest.Mock).mockResolvedValue({ states: [] });
+
+    const res = makeRes();
+    const next = jest.fn();
+    await controller.getUserGuideStatesForVersion(makeReq({}, false), res, next);
+
+    expect(svc.getUserGuideStatesForVersion).toHaveBeenCalledWith(projectId, appId, versionId);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status().json).toHaveBeenCalledWith({ states: [] });
+  });
+
   test("getUserGuideStates returns crawl-session states", async () => {
     (svc.getUserGuideStates as jest.Mock).mockResolvedValue({ states: [] });
 
@@ -43,6 +57,22 @@ describe("userGuides.controller", () => {
     expect(svc.getUserGuideStates).toHaveBeenCalledWith(projectId, appId, versionId, crawlSessionId);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.status().json).toHaveBeenCalledWith({ states: [] });
+  });
+
+  test("generateUserGuidesForVersion returns generated guide with 200", async () => {
+    const response = { message: "User guide generation completed", userGuide: "Guide" };
+    (svc.generateUserGuideForVersion as jest.Mock).mockResolvedValue(response);
+
+    const res = makeRes();
+    const next = jest.fn();
+    await controller.generateUserGuidesForVersion(makeReq({ startStateHash, endStateHash }, false), res, next);
+
+    expect(svc.generateUserGuideForVersion).toHaveBeenCalledWith(projectId, appId, versionId, {
+      startStateHash,
+      endStateHash,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status().json).toHaveBeenCalledWith(response);
   });
 
   test("generateUserGuides returns generated guide with 200", async () => {

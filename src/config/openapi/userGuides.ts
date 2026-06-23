@@ -18,10 +18,14 @@ registry.register("UserGuideStatesResponse", UserGuideStatesResponseSchema);
 registry.register("GenerateUserGuidesBody", GenerateUserGuidesBodySchema);
 registry.register("GenerateUserGuidesResponse", GenerateUserGuidesResponseSchema);
 
-const sessionParams = [
+const versionParams = [
   { name: "projectId", in: "path", required: true, schema: { type: "string" } },
   { name: "appId", in: "path", required: true, schema: { type: "string" } },
   { name: "versionId", in: "path", required: true, schema: { type: "string" } },
+] as const;
+
+const sessionParams = [
+  ...versionParams,
   { name: "crawlSessionId", in: "path", required: true, schema: { type: "string" } },
 ] as const;
 
@@ -34,6 +38,41 @@ type JsonContent = { "application/json": { schema: JsonSchema } };
 
 const json = (schema: JsonSchema): JsonContent => ({
   "application/json": { schema },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/projects/{projectId}/target-applications/{appId}/versions/{versionId}/user-guide-states",
+  tags: ["UserGuides"],
+  summary: "List states available for user guide generation in the latest version session",
+  security: [{ bearerAuth: [] }],
+  parameters: [...versionParams],
+  responses: {
+    200: { description: "States discovered in the latest crawl session", content: json(UserGuideStatesResponseSchema) },
+    400: { description: "Validation failed", content: json(ErrorResponseSchema) },
+    403: { description: "Forbidden", content: json(ErrorResponseSchema) },
+    404: { description: "Not found", content: json(ErrorResponseSchema) },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/projects/{projectId}/target-applications/{appId}/versions/{versionId}/generate-user-guide",
+  tags: ["UserGuides"],
+  summary: "Generate a user guide between two states in the latest version session",
+  security: [{ bearerAuth: [] }],
+  parameters: [...versionParams],
+  request: {
+    body: {
+      content: json(GenerateUserGuidesBodySchema),
+    },
+  },
+  responses: {
+    200: { description: "Generated user guide", content: json(GenerateUserGuidesResponseSchema) },
+    400: { description: "Validation failed", content: json(ErrorResponseSchema) },
+    403: { description: "Forbidden", content: json(ErrorResponseSchema) },
+    404: { description: "Not found", content: json(ErrorResponseSchema) },
+  },
 });
 
 registry.registerPath({
