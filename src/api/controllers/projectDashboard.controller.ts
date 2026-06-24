@@ -11,8 +11,8 @@ import * as projectDashboardService from "@services/projectDashboard.service";
 export async function getProjectDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { projectId } = req.params;
-    const query = ProjectDashboardQuerySchema.parse(req.query);
-    const response = await projectDashboardService.getProjectDashboard(projectId, query.versionId);
+    ProjectDashboardQuerySchema.parse(req.query);
+    const response = await projectDashboardService.getProjectDashboard(projectId);
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);

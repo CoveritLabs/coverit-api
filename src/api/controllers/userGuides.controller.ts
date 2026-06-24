@@ -12,7 +12,6 @@ import * as userGuidesService from "@services/userGuides.service";
 export const getUserGuideStatesForVersion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
-    console.info("sadfaskjhfdlkasjfdh")
     const response = await userGuidesService.getUserGuideStates(projectId, appId, versionId);
     res.status(StatusCodes.OK).json(response);
   } catch (e) {
@@ -25,6 +24,20 @@ export const generateUserGuidesForVersion = async (req: Request, res: Response, 
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
     const body = GenerateUserGuidesBodySchema.parse(req.body);
     const response = await userGuidesService.generateUserGuide(projectId, appId, versionId, body);
+    if (!response.error) {
+      req.recordProjectActivity?.({
+        projectId,
+        eventType: "user_guide.generated",
+        entityType: "user_guide",
+        message: "Generated user guide",
+        metadata: {
+          applicationId: appId,
+          versionId,
+          startStateHash: body.startStateHash,
+          endStateHash: body.endStateHash,
+        },
+      });
+    }
     res.status(StatusCodes.OK).json(response);
   } catch (e) {
     next(e);
