@@ -60,7 +60,7 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   errorMessage: session.error ?? undefined,
 });
 
-async function requireTargetApplication(projectId: string, appId: string) {
+export async function requireTargetApplication(projectId: string, appId: string) {
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) {
     throw new NotFoundError(CRAWL_SESSION_MESSAGES.APPLICATION_NOT_FOUND);
@@ -68,7 +68,7 @@ async function requireTargetApplication(projectId: string, appId: string) {
   return app;
 }
 
-async function requireApplicationVersion(appId: string, versionId: string) {
+export async function requireApplicationVersion(appId: string, versionId: string) {
   const version = await prisma.targetApplicationVersion.findFirst({
     where: { id: versionId, targetApplicationId: appId },
   });

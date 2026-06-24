@@ -6,23 +6,14 @@ import { NextFunction, Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
 
 import { GenerateUserGuidesBodySchema } from "@models/userGuides";
-import { AppVersionParamsSchema, CrawlSessionParamsSchema } from "@models/crawlSession";
+import { AppVersionParamsSchema } from "@models/crawlSession";
 import * as userGuidesService from "@services/userGuides.service";
 
 export const getUserGuideStatesForVersion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
-    const response = await userGuidesService.getUserGuideStatesForVersion(projectId, appId, versionId);
-    res.status(StatusCodes.OK).json(response);
-  } catch (e) {
-    next(e);
-  }
-};
-
-export const getUserGuideStates = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
-    const response = await userGuidesService.getUserGuideStates(projectId, appId, versionId, crawlSessionId);
+    console.info("sadfaskjhfdlkasjfdh")
+    const response = await userGuidesService.getUserGuideStates(projectId, appId, versionId);
     res.status(StatusCodes.OK).json(response);
   } catch (e) {
     next(e);
@@ -33,20 +24,10 @@ export const generateUserGuidesForVersion = async (req: Request, res: Response, 
   try {
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
     const body = GenerateUserGuidesBodySchema.parse(req.body);
-    const response = await userGuidesService.generateUserGuideForVersion(projectId, appId, versionId, body);
+    const response = await userGuidesService.generateUserGuide(projectId, appId, versionId, body);
     res.status(StatusCodes.OK).json(response);
   } catch (e) {
     next(e);
   }
 };
 
-export const generateUserGuides = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
-    const body = GenerateUserGuidesBodySchema.parse(req.body);
-    const response = await userGuidesService.generateUserGuide(projectId, appId, versionId, crawlSessionId, body);
-    res.status(StatusCodes.OK).json(response);
-  } catch (e) {
-    next(e);
-  }
-};
