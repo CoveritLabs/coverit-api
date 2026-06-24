@@ -73,6 +73,13 @@ export const cacheKeys = {
   manualSession: {
     ticket: (ticket: string): string => `manual-session:ticket:${ticket}`,
   },
+  flowEditor: {
+    ticket: (ticket: string): string => `flow-editor:ticket:${ticket}`,
+  },
+  testFlowLabels: {
+    transitions: (graphId: string, checkpointHash: string, transitionHash: string): string =>
+      `test-flow-labels:${graphId}:${checkpointHash}:${transitionHash}`,
+  },
 } as const;
 
 export async function cacheGetJSON<T>(key: string, context?: string): Promise<T | CacheMiss> {

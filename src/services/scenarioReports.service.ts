@@ -29,6 +29,7 @@ import type {
 import { enqueueManualBugReport } from "@queues/arq/docgenArq";
 import { artifactStorage } from "@services/artifactStorage.service";
 import { getValidJiraAccess } from "@services/integrations.service";
+import { recordProjectActivities } from "@services/projectActivity.service";
 import { getUser } from "@services/user.service";
 import { BadRequestError, NotFoundError, UnauthorizedError } from "@utils/errors";
 import { ARTIFACT_STORAGE } from "@constants/artifactStorage";
@@ -266,6 +267,28 @@ export async function createManualBugReport(
     current_url: body.currentUrl,
     recorded_events: body.recordedEvents,
   });
+
+  await recordProjectActivities(
+    [
+      {
+        projectId: app.projectId,
+        eventType: "manual_bug_report.queued",
+        entityType: "scenario_integration_report",
+        entityId: report.id,
+        message: "Queued manual bug report",
+        metadata: {
+          applicationId: app.id,
+          versionId: session.appVersion.id,
+          sessionId: body.sessionId,
+          flowId: body.flowId,
+          provider: body.provider,
+          severity: body.severity,
+          jobId,
+        },
+      },
+    ],
+    session.creatorUserId,
+  );
 
   return { report: mapScenarioIntegrationReport(report), jobId };
 }

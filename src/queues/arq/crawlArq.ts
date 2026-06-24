@@ -29,6 +29,10 @@ export async function enqueueManualRecordSession(sessionId: string): Promise<str
   return enqueueArqJob(sessionId, "manual_record_session", [sessionId], manualArqConfig);
 }
 
+export async function enqueueFlowEditorSession(editorSessionId: string, flowId: string): Promise<string> {
+  return enqueueArqJob(editorSessionId, "flow_editor_session", [editorSessionId, flowId], manualArqConfig);
+}
+
 export async function abortCrawlSession(sessionId: string): Promise<void> {
   await redis
     .multi()
