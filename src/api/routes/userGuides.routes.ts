@@ -22,12 +22,4 @@ router.post(
   guidesController.generateUserGuidesForVersion,
 );
 
-router.get("/crawl-sessions/:crawlSessionId/states", requireProjectMembership, guidesController.getUserGuideStates);
-router.post(
-  "/crawl-sessions/:crawlSessionId/generate",
-  requireProjectMembership,
-  validateBody(GenerateUserGuidesBodySchema),
-  guidesController.generateUserGuides,
-);
-
 export default router;

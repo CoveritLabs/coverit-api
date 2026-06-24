@@ -12,8 +12,8 @@ import type {
   UserGuideStatesResponse,
 } from "@models/userGuides";
 import { docgenArqConfig, enqueueUserGuidesGeneration } from "@queues/arq/docgenArq";
-import { getSessionDetails, getSessions } from "@services/crawlSession.service";
-import { BadRequestError, NotFoundError } from "@utils/errors";
+import { requireApplicationVersion, requireTargetApplication } from "@services/crawlSession.service";
+import { BadRequestError } from "@utils/errors";
 
 const USER_GUIDES_RESULT_TIMEOUT_MS = 30_000;
 const USER_GUIDES_RESULT_POLL_MS = 1_000;
@@ -84,19 +84,9 @@ async function waitForArqResult(jobId: string, timeoutMs = USER_GUIDES_RESULT_TI
   throw new Error("User guide generation timed out");
 }
 
-async function getLatestSessionIdForVersion(projectId: string, appId: string, versionId: string): Promise<string> {
-  const { sessions } = await getSessions(projectId, appId, versionId, { page: 1, pageSize: 1 });
-  const latestSessionId = sessions[0]?.id;
-
-  if (!latestSessionId) {
-    throw new NotFoundError("No crawl session found for this version");
-  }
-
-  return latestSessionId;
-}
-
-export async function getUserGuideStates(projectId: string, appId: string, versionId: string, sessionId: string): Promise<UserGuideStatesResponse> {
-  await getSessionDetails(projectId, appId, versionId, sessionId);
+export async function getUserGuideStates(projectId: string, appId: string, versionId: string): Promise<UserGuideStatesResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
 
   const neo4jSession = getNeo4jReadSession();
 
@@ -104,7 +94,7 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
     const result = await neo4jSession.executeRead((tx) =>
       tx.run(
         `
-        MATCH (s:State {session_id: $sessionId})
+        MATCH (s:State {graph_id: $versionId})
         WHERE s.state_hash IS NOT NULL
         WITH s, coalesce(s.name, s.label, s.title, s.url, s.state_hash) AS displayLabel
         RETURN
@@ -114,7 +104,7 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
           s.title AS title
         ORDER BY toString(s.first_seen) ASC, displayLabel ASC
         `,
-        { sessionId },
+        { versionId },
       ),
     );
 
@@ -129,16 +119,10 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
   }
 }
 
-export async function getUserGuideStatesForVersion(projectId: string, appId: string, versionId: string): Promise<UserGuideStatesResponse> {
-  const sessionId = await getLatestSessionIdForVersion(projectId, appId, versionId);
-  return getUserGuideStates(projectId, appId, versionId, sessionId);
-}
-
 export async function generateUserGuide(
   projectId: string,
   appId: string,
   versionId: string,
-  sessionId: string,
   input: GenerateUserGuidesBody,
 ): Promise<GenerateUserGuidesResponse> {
   const normalizedStartHash = input.startStateHash.toLowerCase();
@@ -148,7 +132,7 @@ export async function generateUserGuide(
     throw new BadRequestError("Start and end states must be different");
   }
 
-  const { states } = await getUserGuideStates(projectId, appId, versionId, sessionId);
+  const { states } = await getUserGuideStates(projectId, appId, versionId);
   const sessionStateHashes = new Set(states.map((state) => state.stateHash.toLowerCase()));
 
   if (!sessionStateHashes.has(normalizedStartHash) || !sessionStateHashes.has(normalizedEndHash)) {
@@ -156,7 +140,7 @@ export async function generateUserGuide(
   }
 
   const payload = {
-    session_id: sessionId,
+    graph_id: versionId,
     start_state_hash: normalizedStartHash,
     end_state_hash: normalizedEndHash,
   };
@@ -170,14 +154,4 @@ export async function generateUserGuide(
     userGuide: userGuide || "Guide generation failed",
     error: result.lastError,
   };
-}
-
-export async function generateUserGuideForVersion(
-  projectId: string,
-  appId: string,
-  versionId: string,
-  input: GenerateUserGuidesBody,
-): Promise<GenerateUserGuidesResponse> {
-  const sessionId = await getLatestSessionIdForVersion(projectId, appId, versionId);
-  return generateUserGuide(projectId, appId, versionId, sessionId, input);
 }
