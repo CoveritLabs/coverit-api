@@ -3,19 +3,36 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+  type FlowEditorConnectResponse as ContractFlowEditorConnectResponse,
+  type FlowEditorDetailResponse as ContractFlowEditorDetailResponse,
+  type FlowEditorDraftStep as ContractFlowEditorDraftStep,
+  type FlowEditorElementRef as ContractFlowEditorElementRef,
+  type FlowEditorStepStateLabel as ContractFlowEditorStepStateLabel,
+  type FlowEditorTestFlowSummary as ContractFlowEditorTestFlowSummary,
+  type FlowEditorTransitionStep as ContractFlowEditorTransitionStep,
   type FlowStep as ContractFlowStep,
   type SaveAllFlowsRequest as ContractSaveAllFlowsRequest,
+  type SaveFlowEditorStepsRequest as ContractSaveFlowEditorStepsRequest,
+  type SaveFlowEditorStepsResponse as ContractSaveFlowEditorStepsResponse,
   type SerializedFlow as ContractSerializedFlow,
 } from "@coveritlabs/contracts";
 import { TestFlowType as PrismaTestFlowType } from "@generated/prisma/client";
 import { CodegenConfigSchema, type CodegenConfig } from "@models/crawlSession";
-import type { TestFlowStepLabelingStatus, TestFlowStepStateLabel } from "@models/testFlowStepLabels";
+import type { TestFlowStepLabelingStatus } from "@models/testFlowStepLabels";
 import { z } from "@utils/zod";
 import type { infer as ZodInfer, ZodType } from "zod";
 import type { Plain } from "./common";
 
 type ContractFlowStepData = Plain<ContractFlowStep>;
 type ContractSerializedFlowData = Plain<ContractSerializedFlow>;
+type ContractFlowEditorTestFlowData = Plain<ContractFlowEditorTestFlowSummary>;
+type ContractFlowEditorElementRefData = Plain<ContractFlowEditorElementRef>;
+type ContractFlowEditorDraftStepData = Plain<ContractFlowEditorDraftStep>;
+type ContractFlowEditorStepStateLabelData = Plain<ContractFlowEditorStepStateLabel>;
+type ContractFlowEditorTransitionStepData = Plain<ContractFlowEditorTransitionStep>;
+type ContractFlowEditorDetailResponseData = Plain<ContractFlowEditorDetailResponse>;
+type ContractSaveFlowEditorStepsRequestData = Plain<ContractSaveFlowEditorStepsRequest>;
+type ContractSaveFlowEditorStepsResponseData = Plain<ContractSaveFlowEditorStepsResponse>;
 
 export type FlowStep = Omit<ContractFlowStepData, "stateHash" | "transition"> & {
   state_hash: ContractFlowStepData["stateHash"];
@@ -78,45 +95,26 @@ export interface FlowEditorInlineCodeBlock {
 export type ListTestFlowsQuery = ZodInfer<typeof ListTestFlowsQuerySchema>;
 export type GenerateTestFlowBody = ZodInfer<typeof GenerateTestFlowBodySchema>;
 
-export interface TestFlowCrawlSessionSummary {
-  id: string;
-  triggerType: string;
-  status: string;
-  createdAt: string;
+export type TestFlowCrawlSessionSummary = Omit<NonNullable<ContractFlowEditorTestFlowData["crawlSession"]>, "finishedAt"> & {
   finishedAt?: string | null;
-}
+};
 
-export interface TestFlowResponse {
-  id: string;
-  crawlSessionId: string;
-  appVersionId: string;
-  appVersionName: string;
-  checkpointStateHash: string;
-  transitionRefs: string[];
+export type TestFlowResponse = Omit<ContractFlowEditorTestFlowData, "testFlowType" | "status" | "generatedAt" | "crawlSession"> & {
   testFlowType: TestFlowType;
-  stepCount: number;
-  editorStepCount: number;
   status: TestFlowStatus;
-  createdAt: string;
   generatedAt: string | null;
-  modifiedAt: string;
   crawlSession: TestFlowCrawlSessionSummary;
-}
+};
 
 export interface ListTestFlowsResponse {
   flows: TestFlowResponse[];
   nextCursor?: string | null;
 }
 
-export interface FlowEditorElementRef {
-  selector?: string;
+export type FlowEditorElementRef = Omit<ContractFlowEditorElementRefData, "selectorCandidates" | "tag" | "attributes" | "box" | "viewport"> & {
   selectorCandidates?: string[];
   tag?: string | null;
-  text?: string;
-  accessibleName?: string;
   attributes?: Record<string, string>;
-  pageUrl?: string;
-  stateHash?: string;
   box?: {
     x: number;
     y: number;
@@ -127,49 +125,43 @@ export interface FlowEditorElementRef {
     width: number;
     height: number;
   };
-}
+};
 
-export interface FlowEditorDraftStep {
-  id: string;
+export type FlowEditorDraftStep = Omit<ContractFlowEditorDraftStepData, "kind" | "position" | "element" | "definition"> & {
   kind: FlowEditorStepKind;
   position: {
     edge: FlowEditorPositionEdge;
     transitionId: string;
   };
-  order: number;
-  label: string;
   element?: FlowEditorElementRef;
   definition: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-}
+};
 
-export interface FlowEditorTransitionStep {
-  id: string;
-  index: number;
-  transitionId: string;
-  label: string;
-  action?: string;
+export type FlowEditorStepStateLabel = Omit<ContractFlowEditorStepStateLabelData, "labelingStatus"> & {
   labelingStatus: TestFlowStepLabelingStatus;
-  fromState?: TestFlowStepStateLabel;
-  toState?: TestFlowStepStateLabel;
-}
+};
 
-export interface FlowEditorDetailResponse {
+export type FlowEditorTransitionStep = Omit<ContractFlowEditorTransitionStepData, "labelingStatus" | "fromState" | "toState"> & {
+  labelingStatus: TestFlowStepLabelingStatus;
+  fromState?: FlowEditorStepStateLabel;
+  toState?: FlowEditorStepStateLabel;
+};
+
+export type FlowEditorDetailResponse = Omit<ContractFlowEditorDetailResponseData, "flow" | "transitionSteps" | "editorSteps"> & {
   flow: TestFlowResponse;
   transitionSteps: FlowEditorTransitionStep[];
   editorSteps: FlowEditorDraftStep[];
-}
+};
 
-export interface SaveFlowEditorStepsResponse {
+export type SaveFlowEditorStepsBody = Omit<ContractSaveFlowEditorStepsRequestData, "editorSteps"> & {
   editorSteps: FlowEditorDraftStep[];
-  editorStepCount: number;
-}
+};
 
-export interface FlowEditorConnectResponse {
-  editorSessionId: string;
-  wsTicket: string;
-}
+export type SaveFlowEditorStepsResponse = Omit<ContractSaveFlowEditorStepsResponseData, "editorSteps"> & {
+  editorSteps: FlowEditorDraftStep[];
+};
+
+export type FlowEditorConnectResponse = Plain<ContractFlowEditorConnectResponse>;
 
 export interface GenerateTestFlowResponse {
   message: string;
@@ -280,5 +272,3 @@ export const FlowEditorDraftStepSchema = z.object({
 export const SaveFlowEditorStepsBodySchema = z.object({
   editorSteps: z.array(FlowEditorDraftStepSchema).max(500),
 });
-
-export type SaveFlowEditorStepsBody = ZodInfer<typeof SaveFlowEditorStepsBodySchema>;
