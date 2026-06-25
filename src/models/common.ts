@@ -8,12 +8,12 @@ import type { Message } from "@bufbuild/protobuf";
 import type { MessageResponse as ContractMessageResponse } from "@coveritlabs/contracts";
 
 /**
- * Recursively strips the protobuf `$typeName` marker from Message types.
+ * Recursively strips protobuf metadata from Message types.
  * Converts protobuf Message objects to plain JS objects.
  */
 export type Plain<T> =
   T extends Message<string>
-    ? { [K in keyof Omit<T, "$typeName">]: Plain<Omit<T, "$typeName">[K]> }
+    ? { [K in keyof Omit<T, "$typeName" | "$unknown">]: Plain<Omit<T, "$typeName" | "$unknown">[K]> }
     : T extends Array<infer U>
       ? Array<Plain<U>>
       : T extends ReadonlyArray<infer U>
