@@ -19,6 +19,14 @@ export const connectManualSession = async (req: Request, res: Response, next: Ne
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
     const userId = getCurrentUserId(req);
     const result = await createManualSession(projectId, appId, versionId, userId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "manual_session.connected",
+      entityType: "crawl_session",
+      entityId: result.sessionId,
+      message: "Connected manual session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.CREATED).json(result);
   } catch (e) {
     next(e);
@@ -30,6 +38,14 @@ export const reattachManualSessionController = async (req: Request, res: Respons
     const { projectId, appId, versionId, sessionId } = ManualSessionParamsSchema.parse(req.params);
     const userId = getCurrentUserId(req);
     const result = await reattachManualSession(projectId, appId, versionId, sessionId, userId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "manual_session.reattached",
+      entityType: "crawl_session",
+      entityId: result.sessionId,
+      message: "Reattached manual session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.OK).json(result);
   } catch (e) {
     next(e);

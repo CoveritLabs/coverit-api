@@ -2,18 +2,33 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
+import { createHash, randomUUID } from "crypto";
+
 import prisma from "@lib/prisma";
 import { CRAWL_SESSION_MESSAGES } from "@constants/messages";
+import { TEST_FLOW_STEP_LABELS, TEST_FLOW_STEP_LABEL_STATUSES } from "@constants/testFlowStepLabels";
+import { env } from "@config/env";
+import redis from "@lib/redis";
+import { cacheGetJSON, cacheKeys, cacheSetJSON } from "@lib/cache";
+import type { TestFlowStepLabel } from "@models/testFlowStepLabels";
 import { enqueueBddGeneration } from "@queues/arq/docgenArq";
+import { addFlowEditorSessionJob } from "@queues/crawl.queue";
+import { getTestFlowStepLabels } from "@repositories/testFlowStepLabels.repository";
 import type {
+  FlowEditorConnectResponse,
+  FlowEditorDetailResponse,
+  FlowEditorDraftStep,
+  FlowEditorTransitionStep,
   GenerateTestFlowBody,
   GenerateTestFlowResponse,
   ListTestFlowsQuery,
   ListTestFlowsResponse,
+  SaveFlowEditorStepsBody,
+  SaveFlowEditorStepsResponse,
   TestFlowResponse,
   TestFlowStatus,
 } from "@models/testFlow";
-import { BadRequestError, ConflictError, NotFoundError } from "@utils/errors";
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "@utils/errors";
 
 type MappedTestFlow = {
   id: string;
@@ -24,6 +39,7 @@ type MappedTestFlow = {
   };
   checkpointStateHash: string;
   transitionRefs: string[];
+  editorSteps?: unknown;
   testFlowType: TestFlowResponse["testFlowType"];
   stepCount: number;
   createdAt: Date;
@@ -38,6 +54,93 @@ type MappedTestFlow = {
   };
 };
 
+type FlowEditorTicketPayload = {
+  editorSessionId: string;
+  flowId: string;
+  userId: string;
+};
+
+function editorStepsFromUnknown(value: unknown): FlowEditorDraftStep[] {
+  return Array.isArray(value) ? (value as FlowEditorDraftStep[]) : [];
+}
+
+function editorStepCount(value: unknown): number {
+  return editorStepsFromUnknown(value).length;
+}
+
+function transitionLabelsCacheKey(flow: Pick<MappedTestFlow, "checkpointStateHash" | "transitionRefs">, graphId: string): string {
+  const transitionHash = createHash("sha256").update(JSON.stringify(flow.transitionRefs)).digest("hex");
+  return cacheKeys.testFlowLabels.transitions(graphId, flow.checkpointStateHash, transitionHash);
+}
+
+function transitionStepsFor(
+  flow: Pick<MappedTestFlow, "transitionRefs">,
+  labels: TestFlowStepLabel[] = [],
+): FlowEditorTransitionStep[] {
+  const labelsByTransition = new Map(labels.map((label) => [label.transitionId, label]));
+  return flow.transitionRefs.map((transitionId, index) => ({
+    id: `${index + 1}:${transitionId}`,
+    index: index + 1,
+    transitionId,
+    label: labelsByTransition.get(transitionId)?.label ?? TEST_FLOW_STEP_LABELS.fallbackTransitionLabel(index + 1),
+    action: labelsByTransition.get(transitionId)?.action,
+    labelingStatus: labelsByTransition.get(transitionId)?.labelingStatus ?? TEST_FLOW_STEP_LABEL_STATUSES.MISSING,
+    fromState: labelsByTransition.get(transitionId)?.fromState,
+    toState: labelsByTransition.get(transitionId)?.toState,
+  }));
+}
+
+async function getCachedTransitionLabels(flow: MappedTestFlow): Promise<TestFlowStepLabel[]> {
+  if (flow.transitionRefs.length === 0) return [];
+
+  const graphId = graphIdForTestFlow(flow);
+  const key = transitionLabelsCacheKey(flow, graphId);
+  const cached = await cacheGetJSON<TestFlowStepLabel[]>(key, "testFlow.stepLabels");
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const labels = await getTestFlowStepLabels(graphId, flow.transitionRefs);
+    await cacheSetJSON(key, labels, TEST_FLOW_STEP_LABELS.CACHE_TTL_SECONDS, "testFlow.stepLabels");
+    return labels;
+  } catch {
+    return [];
+  }
+}
+
+function assertEditorStepsTargetFlow(flow: Pick<MappedTestFlow, "transitionRefs">, editorSteps: FlowEditorDraftStep[]): void {
+  const transitionIds = new Set(flow.transitionRefs);
+  const invalid = editorSteps.find((step) => !transitionIds.has(step.position.transitionId));
+  if (invalid) {
+    throw new BadRequestError(`Editor step "${invalid.id}" targets a transition that is not part of this TestFlow`);
+  }
+}
+
+async function issueFlowEditorTicket(editorSessionId: string, flowId: string, userId: string): Promise<string> {
+  const ticket = randomUUID();
+  const payload: FlowEditorTicketPayload = { editorSessionId, flowId, userId };
+  await redis.set(cacheKeys.flowEditor.ticket(ticket), JSON.stringify(payload), "EX", env.MANUAL_SESSION_TICKET_TTL_SECONDS);
+  return ticket;
+}
+
+export async function consumeFlowEditorTicket(editorSessionId: string, ticket: string): Promise<FlowEditorTicketPayload> {
+  const key = cacheKeys.flowEditor.ticket(ticket);
+  const raw = await redis.get(key);
+  if (!raw) {
+    throw new UnauthorizedError("Flow editor ticket is invalid or expired");
+  }
+
+  await redis.del(key);
+
+  const parsed = JSON.parse(raw) as FlowEditorTicketPayload;
+  if (parsed.editorSessionId !== editorSessionId) {
+    throw new UnauthorizedError("Flow editor ticket does not match the session ID");
+  }
+
+  return parsed;
+}
+
 function mapTestFlow(flow: MappedTestFlow): TestFlowResponse {
   const status = getTestFlowStatus(flow.generatedAt, flow.modifiedAt);
   return {
@@ -49,6 +152,7 @@ function mapTestFlow(flow: MappedTestFlow): TestFlowResponse {
     transitionRefs: flow.transitionRefs,
     testFlowType: flow.testFlowType,
     stepCount: flow.stepCount,
+    editorStepCount: editorStepCount(flow.editorSteps),
     status,
     createdAt: flow.createdAt.toISOString(),
     generatedAt: flow.generatedAt ? flow.generatedAt.toISOString() : null,
@@ -119,12 +223,7 @@ export async function listTestFlows(
   };
 }
 
-export async function generateTestFlow(
-  projectId: string,
-  appId: string,
-  flowId: string,
-  input: GenerateTestFlowBody,
-): Promise<GenerateTestFlowResponse> {
+async function findScopedFlow(projectId: string, appId: string, flowId: string): Promise<MappedTestFlow> {
   const flow = await prisma.testFlow.findFirst({
     where: {
       id: flowId,
@@ -150,10 +249,98 @@ export async function generateTestFlow(
   });
 
   const mappedFlow = flow as MappedTestFlow | null;
-
   if (!mappedFlow) {
     throw new NotFoundError("Test flow not found");
   }
+
+  return mappedFlow;
+}
+
+function sortEditorSteps(flow: Pick<MappedTestFlow, "transitionRefs">, editorSteps: FlowEditorDraftStep[]): FlowEditorDraftStep[] {
+  const transitionOrder = new Map(flow.transitionRefs.map((transitionId, index) => [transitionId, index]));
+  return [...editorSteps].sort((left, right) => {
+    const leftTransition = transitionOrder.get(left.position.transitionId) ?? Number.MAX_SAFE_INTEGER;
+    const rightTransition = transitionOrder.get(right.position.transitionId) ?? Number.MAX_SAFE_INTEGER;
+    if (leftTransition !== rightTransition) return leftTransition - rightTransition;
+    if (left.position.edge !== right.position.edge) return left.position.edge === "before" ? -1 : 1;
+    if (left.order !== right.order) return left.order - right.order;
+    return left.id.localeCompare(right.id);
+  });
+}
+
+export async function getFlowEditor(projectId: string, appId: string, flowId: string): Promise<FlowEditorDetailResponse> {
+  const flow = await findScopedFlow(projectId, appId, flowId);
+  const labels = await getCachedTransitionLabels(flow);
+  return {
+    flow: mapTestFlow(flow),
+    transitionSteps: transitionStepsFor(flow, labels),
+    editorSteps: sortEditorSteps(flow, editorStepsFromUnknown(flow.editorSteps)),
+  };
+}
+
+export async function saveFlowEditorSteps(
+  projectId: string,
+  appId: string,
+  flowId: string,
+  input: SaveFlowEditorStepsBody,
+): Promise<SaveFlowEditorStepsResponse> {
+  const flow = await findScopedFlow(projectId, appId, flowId);
+  assertEditorStepsTargetFlow(flow, input.editorSteps);
+  const editorSteps = sortEditorSteps(flow, input.editorSteps);
+  const modifiedAt = new Date();
+
+  const result = await (prisma as any).testFlow.updateMany({
+    where: {
+      id: flowId,
+      appVersion: {
+        targetApplicationId: appId,
+        targetApplication: { projectId },
+      },
+    },
+    data: {
+      editorSteps,
+      modifiedAt,
+    },
+  });
+
+  if (result.count !== 1) {
+    throw new NotFoundError("Test flow not found");
+  }
+
+  return {
+    editorSteps,
+    editorStepCount: editorSteps.length,
+  };
+}
+
+export async function connectFlowEditor(
+  projectId: string,
+  appId: string,
+  flowId: string,
+  userId: string,
+): Promise<FlowEditorConnectResponse> {
+  if (!userId) {
+    throw new UnauthorizedError("Authentication is required");
+  }
+
+  await findScopedFlow(projectId, appId, flowId);
+
+  const editorSessionId = randomUUID();
+  await addFlowEditorSessionJob(editorSessionId, flowId);
+
+  return {
+    editorSessionId,
+    wsTicket: await issueFlowEditorTicket(editorSessionId, flowId, userId),
+  };
+}
+
+export async function generateTestFlow(
+  projectId: string,
+  appId: string,
+  flowId: string,
+  input: GenerateTestFlowBody,
+): Promise<GenerateTestFlowResponse> {
+  const mappedFlow = await findScopedFlow(projectId, appId, flowId);
 
   const regressionCodebase = await prisma.regressionCodebase.findUnique({
     where: { id: input.regressionCodebaseId },
@@ -172,6 +359,7 @@ export async function generateTestFlow(
     throw new BadRequestError("Test flow has no transitions to generate");
   }
 
+  const editorSteps = sortEditorSteps(mappedFlow, editorStepsFromUnknown(mappedFlow.editorSteps));
   const payload = {
     session_id: mappedFlow.crawlSessionId,
     graph_id: graphIdForTestFlow(mappedFlow),
@@ -183,6 +371,7 @@ export async function generateTestFlow(
         flow_id: mappedFlow.id,
         checkpoint_hash: mappedFlow.checkpointStateHash,
         transition_ids: mappedFlow.transitionRefs,
+        editor_steps: editorSteps,
       },
     ],
   };

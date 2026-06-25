@@ -44,15 +44,11 @@ export type JiraReportingProject = Plain<ContractJiraIssueProject>;
 export type JiraReportingIssueType = Plain<ContractJiraIssueType>;
 export type JiraReportingConfig = Plain<ContractJiraReportingConfig>;
 
-export type IntegrationReportingConfig =
-  | { case: typeof JIRA_API_PROVIDER; value: JiraReportingConfig }
-  | { case: undefined; value?: undefined };
+export type IntegrationReportingConfig = { case: typeof JIRA_API_PROVIDER; value: JiraReportingConfig } | { case: undefined; value?: undefined };
 
 export type JiraReportingOptions = Plain<ContractJiraReportingOptions>;
 
-export type IntegrationReportingOptions =
-  | { case: typeof JIRA_API_PROVIDER; value: JiraReportingOptions }
-  | { case: undefined; value?: undefined };
+export type IntegrationReportingOptions = { case: typeof JIRA_API_PROVIDER; value: JiraReportingOptions } | { case: undefined; value?: undefined };
 
 export interface IntegrationProviderAdapter {
   apiProvider: IntegrationProvider;

@@ -482,6 +482,7 @@ model TestFlow {
   appVersionId        String   @map("app_version_id") @db.Uuid
   checkpointStateHash String   @map("checkpoint_state_hash")
   transitionRefs      String[] @map("transition_refs")
+  editorSteps         Json     @default("[]") @map("editor_steps")
   testFlowType        TestFlowType @map("test_flow_type")
   stepCount           Int      @map("step_count")
   createdAt           DateTime @default(now()) @map("created_at")

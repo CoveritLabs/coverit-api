@@ -47,6 +47,10 @@ describe("crawlSchedule.service", () => {
         maxStates: 10,
         timeoutSeconds: 60,
         generateTestFlows: true,
+        generateTestCode: true,
+        testFlowGeneration: {
+          maxNumOfTf: 12,
+        },
         crawlerSettings: {
           maxElementsPerState: 50,
           maxActionRepeatsPerUrl: 10,
@@ -62,6 +66,10 @@ describe("crawlSchedule.service", () => {
           maxStates: 10,
           timeoutSeconds: 60,
           generateTestFlows: true,
+          generateTestCode: true,
+          testFlowGeneration: expect.objectContaining({
+            max_num_of_tf: 12,
+          }),
           crawlerSettings: expect.objectContaining({
             max_elements_per_state: 50,
             max_action_repeats_per_url: 10,

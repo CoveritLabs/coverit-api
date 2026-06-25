@@ -56,6 +56,7 @@ export const JiraIssueProjectSchema = z.object({
 export const JiraIssueTypeSchema = z.object({
   id: z.requiredString("Jira issue type id is required"),
   name: z.requiredString("Jira issue type name is required"),
+  projectId: z.requiredString("Jira issue type project id is required"),
 });
 
 export const JiraReportingConfigSchema = z.object({
@@ -69,20 +70,14 @@ export const JiraReportingOptionsSchema = z.object({
   issueTypes: z.array(JiraIssueTypeSchema),
 });
 
-export const IntegrationReportingConfigSchema = z.union([
-  z.object({ case: z.literal("jira"), value: JiraReportingConfigSchema }),
-  z.object({}),
-]);
+export const IntegrationReportingConfigSchema = z.union([z.object({ case: z.literal("jira"), value: JiraReportingConfigSchema }), z.object({})]);
 
 export const IntegrationStatusReportingConfigSchema = z.union([
   z.object({ case: z.literal("jiraReportingConfig"), value: JiraReportingConfigSchema }),
   z.object({}),
 ]);
 
-export const IntegrationReportingOptionsSchema = z.union([
-  z.object({ case: z.literal("jira"), value: JiraReportingOptionsSchema }),
-  z.object({}),
-]);
+export const IntegrationReportingOptionsSchema = z.union([z.object({ case: z.literal("jira"), value: JiraReportingOptionsSchema }), z.object({})]);
 
 export const StartIntegrationOAuthResponseSchema = z.object({ authorizationUrl: z.string().url() });
 

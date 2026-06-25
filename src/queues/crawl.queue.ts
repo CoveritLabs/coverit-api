@@ -2,7 +2,12 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import { abortCrawlSession, enqueueCrawlSession, enqueueManualRecordSession } from "@queues/arq/crawlArq";
+import {
+  abortCrawlSession,
+  enqueueCrawlSession,
+  enqueueFlowEditorSession,
+  enqueueManualRecordSession,
+} from "@queues/arq/crawlArq";
 
 export async function addCrawlJob(sessionId: string): Promise<string> {
   return enqueueCrawlSession(sessionId);
@@ -10,6 +15,10 @@ export async function addCrawlJob(sessionId: string): Promise<string> {
 
 export async function addManualSessionJob(sessionId: string): Promise<string> {
   return enqueueManualRecordSession(sessionId);
+}
+
+export async function addFlowEditorSessionJob(editorSessionId: string, flowId: string): Promise<string> {
+  return enqueueFlowEditorSession(editorSessionId, flowId);
 }
 
 export async function removeCrawlJob(sessionId: string): Promise<boolean> {

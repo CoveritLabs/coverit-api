@@ -20,6 +20,7 @@ export type CrawlConfig = {
   maxStates?: number;
   timeoutSeconds?: number;
   generateTestFlows?: boolean;
+  generateTestCode?: boolean;
   testFlowGeneration?: TestFlowGenerationConfig;
   crawlerSettings?: CrawlerRunSettings;
   inputDefaults?: InputDefaultsConfig;
@@ -27,6 +28,7 @@ export type CrawlConfig = {
 export type TestFlowGenerationConfig = {
   coveragePercentage?: number;
   numOfTf?: number;
+  maxNumOfTf?: number;
   numOfStates?: number;
   minNumOfStatesPerTf?: number;
 };
@@ -127,6 +129,12 @@ export const TestFlowGenerationConfigSchema = z
       .min(1)
       .transform((value) => Math.min(TEST_FLOW_GENERATION_MAX_TF, value))
       .default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.numOfTf),
+    maxNumOfTf: z
+      .number()
+      .int()
+      .min(1)
+      .transform((value) => Math.min(TEST_FLOW_GENERATION_MAX_TF, value))
+      .default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.maxNumOfTf),
     numOfStates: z.number().int().min(1).max(100_000).default(DEFAULT_CRAWL_CONFIG.testFlowGeneration.numOfStates),
     minNumOfStatesPerTf: z
       .number()
@@ -142,6 +150,7 @@ export const CrawlConfigSchema = z
     maxStates: z.number().int().min(1).max(100_000).default(DEFAULT_CRAWL_CONFIG.maxStates),
     timeoutSeconds: z.number().int().min(1).max(86400).default(DEFAULT_CRAWL_CONFIG.timeoutSeconds),
     generateTestFlows: z.boolean().default(DEFAULT_CRAWL_CONFIG.generateTestFlows),
+    generateTestCode: z.boolean().default(DEFAULT_CRAWL_CONFIG.generateTestCode),
     testFlowGeneration: TestFlowGenerationConfigSchema.optional().default(() => ({ ...DEFAULT_CRAWL_CONFIG.testFlowGeneration })),
     crawlerSettings: CrawlerRunSettingsSchema.optional().default({}),
     inputDefaults: InputDefaultsConfigSchema.optional(),

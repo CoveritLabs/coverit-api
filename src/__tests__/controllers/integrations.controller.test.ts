@@ -15,11 +15,18 @@ import { INTEGRATIONS_MESSAGES } from "@constants/messages";
 import * as integrationsService from "@services/integrations.service";
 import { buildRedirectUrl } from "@utils/redirect";
 
+const recordProjectActivity = jest.fn();
+
 function makeApp() {
   const app = express();
   app.use(express.json());
+  app.use((req, _res, next) => {
+    (req as any).recordProjectActivity = recordProjectActivity;
+    next();
+  });
   app.post("/projects/:projectId/integrations/:provider/oauth", controller.startOAuth);
   app.get("/projects/:projectId/integrations/:provider", controller.getIntegrationStatus);
+  app.put("/projects/:projectId/integrations/:provider/reporting-config", controller.updateReportingConfig);
   app.delete("/projects/:projectId/integrations/:provider", controller.disconnectIntegration);
   app.get("/oauth/:provider/callback", controller.oauthCallback);
   return app;
@@ -30,6 +37,7 @@ describe("integrations.controller", () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    recordProjectActivity.mockReset();
     app = makeApp();
     (getCurrentUserId as jest.Mock).mockReturnValue("u1");
     (buildRedirectUrl as jest.Mock).mockImplementation((baseUrl: string, pathname: string, query: Record<string, string>) => {
@@ -67,6 +75,61 @@ describe("integrations.controller", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ message: "ok" });
     expect(integrationsService.disconnectIntegration).toHaveBeenCalledWith("p1", "jira");
+    expect(recordProjectActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "p1",
+        eventType: "integration.disconnected",
+        entityType: "project_integration",
+        entityId: "jira",
+      }),
+    );
+  });
+
+  test("updateReportingConfig records activity after service success", async () => {
+    const body = {
+      config: {
+        case: "jira",
+        value: {
+          enabled: true,
+          project: { id: "10000", key: "COV", name: "CoverIt" },
+          issueType: { id: "10001", name: "Bug", projectId: "10000" },
+        },
+      },
+    };
+    (integrationsService.updateReportingConfig as jest.Mock).mockResolvedValue({ provider: "jira", config: body.config });
+
+    const res = await request(app).put("/projects/p1/integrations/jira/reporting-config").send(body);
+
+    expect(res.status).toBe(200);
+    expect(integrationsService.updateReportingConfig).toHaveBeenCalledWith("p1", "jira", body);
+    expect(recordProjectActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "p1",
+        eventType: "integration.reporting_config_updated",
+        entityType: "project_integration",
+        entityId: "jira",
+      }),
+    );
+  });
+
+  test("updateReportingConfig skips activity when service fails", async () => {
+    const body = {
+      config: {
+        case: "jira",
+        value: {
+          enabled: true,
+          project: { id: "10000", key: "COV", name: "CoverIt" },
+          issueType: { id: "10001", name: "Bug", projectId: "10000" },
+        },
+      },
+    };
+    (integrationsService.updateReportingConfig as jest.Mock).mockRejectedValue(new Error("not connected"));
+
+    const res = await request(app).put("/projects/p1/integrations/jira/reporting-config").send(body);
+
+    expect(res.status).toBe(500);
+    expect(integrationsService.updateReportingConfig).toHaveBeenCalledWith("p1", "jira", body);
+    expect(recordProjectActivity).not.toHaveBeenCalled();
   });
 
   test("oauthCallback redirects to service success URL", async () => {

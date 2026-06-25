@@ -22,6 +22,14 @@ type Neo4jRecordLike = {
   get(key: string): unknown;
 };
 
+type Neo4jReadResultLike = {
+  records: Neo4jRecordLike[];
+};
+
+type Neo4jTransactionLike = {
+  run(query: string, params?: Record<string, unknown>): Promise<Neo4jReadResultLike>;
+};
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -91,7 +99,7 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
   const neo4jSession = getNeo4jReadSession();
 
   try {
-    const result = await neo4jSession.executeRead((tx) =>
+    const result = await neo4jSession.executeRead((tx: Neo4jTransactionLike) =>
       tx.run(
         `
         MATCH (s:State {graph_id: $versionId})
@@ -109,7 +117,7 @@ export async function getUserGuideStates(projectId: string, appId: string, versi
     );
 
     return {
-      states: result.records.flatMap((record) => {
+      states: result.records.flatMap((record: Neo4jRecordLike) => {
         const state = mapStateRecord(record);
         return state ? [state] : [];
       }),

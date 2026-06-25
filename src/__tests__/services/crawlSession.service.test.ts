@@ -65,9 +65,11 @@ describe("crawlSession.service", () => {
         maxStates: 10,
         timeoutSeconds: 60,
         generateTestFlows: true,
+        generateTestCode: true,
         testFlowGeneration: {
           coveragePercentage: 80,
           numOfTf: TEST_FLOW_GENERATION_MAX_TF + 500,
+          maxNumOfTf: TEST_FLOW_GENERATION_MAX_TF + 250,
           numOfStates: 12,
           minNumOfStatesPerTf: 4,
         },
@@ -87,9 +89,11 @@ describe("crawlSession.service", () => {
             maxStates: 10,
             timeoutSeconds: 60,
             generateTestFlows: true,
+            generateTestCode: true,
             testFlowGeneration: expect.objectContaining({
               coverage_percentage: 80,
               num_of_tf: TEST_FLOW_GENERATION_MAX_TF,
+              max_num_of_tf: TEST_FLOW_GENERATION_MAX_TF,
               num_of_states: 12,
               min_num_of_states_per_tf: 4,
             }),
@@ -105,9 +109,11 @@ describe("crawlSession.service", () => {
     expect(result.crawlConfig.testFlowGeneration).toEqual({
       coveragePercentage: 80,
       numOfTf: TEST_FLOW_GENERATION_MAX_TF,
+      maxNumOfTf: TEST_FLOW_GENERATION_MAX_TF,
       numOfStates: 12,
       minNumOfStatesPerTf: 4,
     });
+    expect(result.crawlConfig.generateTestCode).toBe(true);
     expect(result.crawlConfig.crawlerSettings).toEqual(
       expect.objectContaining({
         maxElementsPerState: 50,

@@ -9,6 +9,9 @@ import * as testFlowController from "@api/controllers/testFlow.controller";
 const router = Router({ mergeParams: true });
 
 router.get("/", testFlowController.listTestFlows);
+router.get("/:flowId/editor", testFlowController.getFlowEditor);
+router.put("/:flowId/editor/steps", testFlowController.saveFlowEditorSteps);
+router.post("/:flowId/editor/connect", testFlowController.connectFlowEditor);
 router.post("/:flowId/generate", testFlowController.generateTestFlow);
 
 export default router;

@@ -79,10 +79,12 @@ export const toPersistedCrawlConfig = (config: CrawlConfig): Prisma.InputJsonVal
   if (config.maxStates !== undefined) persisted.maxStates = config.maxStates;
   if (config.timeoutSeconds !== undefined) persisted.timeoutSeconds = config.timeoutSeconds;
   if (config.generateTestFlows !== undefined) persisted.generateTestFlows = config.generateTestFlows;
+  if (config.generateTestCode !== undefined) persisted.generateTestCode = config.generateTestCode;
   if (generation) {
     persisted.testFlowGeneration = {
       coverage_percentage: generation.coveragePercentage,
       num_of_tf: generation.numOfTf,
+      max_num_of_tf: generation.maxNumOfTf,
       num_of_states: generation.numOfStates,
       min_num_of_states_per_tf: generation.minNumOfStatesPerTf,
     };
@@ -137,6 +139,7 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
     maxStates: persisted.maxStates ?? persisted.max_states ?? defaults.maxStates,
     timeoutSeconds: persisted.timeoutSeconds ?? persisted.timeout_seconds ?? defaults.timeoutSeconds,
     generateTestFlows: persisted.generateTestFlows ?? persisted.generate_test_flows ?? defaults.generateTestFlows,
+    generateTestCode: persisted.generateTestCode ?? persisted.generate_test_code ?? defaults.generateTestCode,
     testFlowGeneration:
       Object.keys(generation).length > 0
         ? {
@@ -145,6 +148,10 @@ export const fromPersistedCrawlConfig = (value: unknown, defaults: Record<string
               generation.coveragePercentage ??
               readObject(defaults.testFlowGeneration).coveragePercentage,
             numOfTf: generation.num_of_tf ?? generation.numOfTf ?? readObject(defaults.testFlowGeneration).numOfTf,
+            maxNumOfTf:
+              generation.max_num_of_tf ??
+              generation.maxNumOfTf ??
+              readObject(defaults.testFlowGeneration).maxNumOfTf,
             numOfStates:
               generation.num_of_states ?? generation.numOfStates ?? readObject(defaults.testFlowGeneration).numOfStates,
             minNumOfStatesPerTf:

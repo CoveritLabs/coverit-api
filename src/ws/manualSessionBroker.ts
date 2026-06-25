@@ -304,7 +304,6 @@ export function setupManualSessionWebSockets(server: HttpServer): void {
     }
 
     if (!sessionId || !role) {
-      rejectUpgrade(socket, 404, "Not Found");
       return;
     }
 
