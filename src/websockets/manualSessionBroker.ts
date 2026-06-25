@@ -30,6 +30,7 @@ type SessionSockets = {
 const MANUAL_SESSION_SOCKET_MESSAGE_TYPES = {
   "browser.input": ManualSessionSocketMessageType.BROWSER_INPUT,
   "flow.start": ManualSessionSocketMessageType.FLOW_START,
+  "flow.publish_pending": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.finish": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.rewind": ManualSessionSocketMessageType.UNSPECIFIED,
   "bug.report": ManualSessionSocketMessageType.UNSPECIFIED,
@@ -42,6 +43,7 @@ const MANUAL_SESSION_SOCKET_MESSAGE_TYPES = {
   "recorded.step": ManualSessionSocketMessageType.UNSPECIFIED,
   "session.ttl": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.started": ManualSessionSocketMessageType.FLOW_STARTED,
+  "flow.pending_published": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.completed": ManualSessionSocketMessageType.UNSPECIFIED,
   "flow.rewound": ManualSessionSocketMessageType.UNSPECIFIED,
   "bug.reported": ManualSessionSocketMessageType.UNSPECIFIED,
@@ -76,6 +78,7 @@ type WsMessage = Omit<ManualSessionSocketMessageContract, "type" | "status" | "r
 const FRONTEND_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>([
   "browser.input",
   "flow.start",
+  "flow.publish_pending",
   "flow.finish",
   "flow.rewind",
   "bug.report",
@@ -90,6 +93,7 @@ const CRAWLER_MESSAGE_TYPES = new Set<ManualSessionSocketMessageName>([
   "recorded.step",
   "session.ttl",
   "flow.started",
+  "flow.pending_published",
   "flow.completed",
   "flow.rewound",
   "bug.reported",

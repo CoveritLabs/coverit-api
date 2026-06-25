@@ -21,6 +21,11 @@ describe("manualSessionBroker websocket allowlists", () => {
     expect(source).toContain('"recorded.step"');
   });
 
+  test("allows manual pending publish messages", () => {
+    expect(source).toContain('"flow.publish_pending"');
+    expect(source).toContain('"flow.pending_published"');
+  });
+
   test("allows manual session ttl messages from the crawler", () => {
     expect(source).toContain('"session.ttl"');
   });
