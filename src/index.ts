@@ -9,8 +9,8 @@ import prisma from "@lib/prisma";
 import redis from "@lib/redis";
 import { verifyNeo4jConnection } from "@lib/neo4j";
 import { env } from "@config/env";
-import { setupFlowEditorWebSockets } from "./ws/flowEditorBroker";
-import { setupManualSessionWebSockets } from "./ws/manualSessionBroker";
+import { setupFlowEditorWebSockets } from "./websockets/flowEditorBroker";
+import { setupManualSessionWebSockets } from "./websockets/manualSessionBroker";
 
 async function startServer(): Promise<void> {
   console.info("Connecting to PostgreSQL...");

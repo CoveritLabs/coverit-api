@@ -6,7 +6,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 describe("manualSessionBroker websocket allowlists", () => {
-  const source = readFileSync(join(__dirname, "../../ws/manualSessionBroker.ts"), "utf8");
+  const source = readFileSync(join(__dirname, "../../websockets/manualSessionBroker.ts"), "utf8");
 
   test("allows manual flow completion and bug reporting messages", () => {
     expect(source).toContain('"flow.finish"');
