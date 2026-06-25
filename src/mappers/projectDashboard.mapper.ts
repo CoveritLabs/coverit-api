@@ -5,36 +5,18 @@
 import type { Prisma } from "@generated/prisma/client";
 import type {
   ProjectActivity,
-  ProjectDashboardVersionRef,
-  ProjectLatestCrawlSession,
-  ProjectLatestRun,
-  ProjectLatestTestFlow,
+  ProjectCrawlSessionTrendPoint,
+  ProjectRunTrendPoint,
 } from "@models/projectDashboard";
 
-export type DashboardVersionRow = Prisma.TargetApplicationVersionGetPayload<{
-  include: { targetApplication: { select: { id: true; name: true } } };
-}>;
-
-export type DashboardLatestRunRow = Prisma.RegressionRunGetPayload<{
+export type DashboardRunTrendRow = Prisma.RegressionRunGetPayload<{
   include: {
     targetApplication: { select: { id: true; name: true } };
     version: { select: { id: true; version: true } };
   };
 }>;
 
-export type DashboardLatestCrawlSessionRow = Prisma.CrawlSessionGetPayload<{
-  include: {
-    appVersion: {
-      select: {
-        id: true;
-        version: true;
-        targetApplication: { select: { id: true; name: true } };
-      };
-    };
-  };
-}>;
-
-export type DashboardLatestTestFlowRow = Prisma.TestFlowGetPayload<{
+export type DashboardCrawlSessionTrendRow = Prisma.CrawlSessionGetPayload<{
   include: {
     appVersion: {
       select: {
@@ -60,16 +42,7 @@ export function displayRunName(name: string, nameNumber: number): string {
   return nameNumber <= 1 ? name : `${name} #${nameNumber}`;
 }
 
-export function mapDashboardVersion(version: DashboardVersionRow): ProjectDashboardVersionRef {
-  return {
-    id: version.id,
-    version: version.version,
-    applicationId: version.targetApplication.id,
-    applicationName: version.targetApplication.name,
-  } as ProjectDashboardVersionRef;
-}
-
-export function mapLatestRun(run: DashboardLatestRunRow): ProjectLatestRun {
+export function mapRunTrendPoint(run: DashboardRunTrendRow): ProjectRunTrendPoint {
   return {
     id: run.id,
     runId: run.runId,
@@ -82,15 +55,14 @@ export function mapLatestRun(run: DashboardLatestRunRow): ProjectLatestRun {
     passedCount: run.passedCount,
     warningCount: run.warningCount,
     failedCount: run.failedCount,
+    durationMs: run.durationMs ?? undefined,
     createdAt: run.createdAt.toISOString(),
-  } as ProjectLatestRun;
+  };
 }
 
-export function mapLatestCrawlSession(session: DashboardLatestCrawlSessionRow): ProjectLatestCrawlSession {
+export function mapCrawlSessionTrendPoint(session: DashboardCrawlSessionTrendRow): ProjectCrawlSessionTrendPoint {
   return {
     id: session.id,
-    status: toPublicStatus(session.status),
-    triggerType: toPublicStatus(session.triggerType),
     applicationId: session.appVersion.targetApplication.id,
     applicationName: session.appVersion.targetApplication.name,
     versionId: session.appVersion.id,
@@ -98,25 +70,8 @@ export function mapLatestCrawlSession(session: DashboardLatestCrawlSessionRow): 
     stateCount: session.stateCount,
     transitionCount: session.transitionCount,
     createdAt: session.createdAt.toISOString(),
-    startedAt: toIso(session.startedAt),
     finishedAt: toIso(session.finishedAt),
-  } as ProjectLatestCrawlSession;
-}
-
-export function mapLatestTestFlow(flow: DashboardLatestTestFlowRow): ProjectLatestTestFlow {
-  return {
-    id: flow.id,
-    crawlSessionId: flow.crawlSessionId,
-    applicationId: flow.appVersion.targetApplication.id,
-    applicationName: flow.appVersion.targetApplication.name,
-    versionId: flow.appVersion.id,
-    version: flow.appVersion.version,
-    checkpointStateHash: flow.checkpointStateHash,
-    checkpointUrl: "",
-    isClipped: false,
-    stepCount: flow.stepCount,
-    createdAt: flow.createdAt.toISOString(),
-  } as ProjectLatestTestFlow;
+  };
 }
 
 export function mapProjectActivity(activity: DashboardProjectActivityRow): ProjectActivity {
@@ -131,5 +86,5 @@ export function mapProjectActivity(activity: DashboardProjectActivityRow): Proje
     actorName: activity.actorName ?? undefined,
     actorEmail: activity.actorEmail ?? undefined,
     createdAt: activity.createdAt.toISOString(),
-  } as ProjectActivity;
+  };
 }

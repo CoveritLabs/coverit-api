@@ -3,17 +3,34 @@
 // See LICENSE file in the project root for full license information.
 
 jest.mock("@lib/prisma", () => require("../mocks/prisma"));
+jest.mock("@lib/redis", () => ({
+  set: jest.fn(),
+  get: jest.fn(),
+  del: jest.fn(),
+}));
 jest.mock("@queues/arq/docgenArq", () => ({
   enqueueBddGeneration: jest.fn(),
 }));
+jest.mock("@queues/crawl.queue", () => ({
+  addFlowEditorSessionJob: jest.fn(),
+}));
+jest.mock("@repositories/testFlowStepLabels.repository", () => ({
+  getTestFlowStepLabels: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
+import redis from "@lib/redis";
 import { enqueueBddGeneration } from "@queues/arq/docgenArq";
+import { addFlowEditorSessionJob } from "@queues/crawl.queue";
+import { getTestFlowStepLabels } from "@repositories/testFlowStepLabels.repository";
 import * as svc from "@services/testFlow.service";
 import { ConflictError, NotFoundError } from "@utils/errors";
 
 const mockPrisma = prisma as any;
+const mockRedis = redis as any;
 const mockEnqueueBddGeneration = enqueueBddGeneration as jest.Mock;
+const mockAddFlowEditorSessionJob = addFlowEditorSessionJob as jest.Mock;
+const mockGetTestFlowStepLabels = getTestFlowStepLabels as jest.Mock;
 
 function flow(overrides: Record<string, any> = {}) {
   return {
@@ -22,6 +39,7 @@ function flow(overrides: Record<string, any> = {}) {
     appVersionId: "version-1",
     checkpointStateHash: "state-1",
     transitionRefs: ["transition-1"],
+    editorSteps: [],
     testFlowType: "MANUAL",
     stepCount: 1,
     createdAt: new Date("2026-06-22T00:00:00.000Z"),
@@ -48,6 +66,11 @@ describe("testFlow.service", () => {
     mockPrisma.testFlow.findMany.mockResolvedValue([flow()]);
     mockPrisma.regressionCodebase.findUnique.mockResolvedValue({ id: "codebase-1", targetApplicationId: "app-1" });
     mockEnqueueBddGeneration.mockResolvedValue("job-1");
+    mockAddFlowEditorSessionJob.mockResolvedValue("editor-job-1");
+    mockGetTestFlowStepLabels.mockResolvedValue([]);
+    mockRedis.set.mockResolvedValue("OK");
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.del.mockResolvedValue(1);
   });
 
   test("lists flows scoped to project and application", async () => {
@@ -64,6 +87,7 @@ describe("testFlow.service", () => {
           transitionRefs: ["transition-1"],
           testFlowType: "MANUAL",
           stepCount: 1,
+          editorStepCount: 0,
           status: "NEEDS_GENERATION",
           createdAt: "2026-06-22T00:00:00.000Z",
           generatedAt: null,
@@ -172,9 +196,204 @@ describe("testFlow.service", () => {
           flow_id: "flow-2",
           checkpoint_hash: "state-1",
           transition_ids: ["transition-1"],
+          editor_steps: [],
         },
       ],
     });
+  });
+
+  test("returns editor details with persisted draft steps", async () => {
+    const draft = {
+      id: "draft-1",
+      kind: "assertion",
+      position: { edge: "after", transitionId: "transition-1" },
+      order: 1,
+      label: "Assert cart",
+      definition: {},
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow({ editorSteps: [draft] }));
+
+    const result = await svc.getFlowEditor("project-1", "app-1", "flow-1");
+
+    expect(result.editorSteps).toEqual([draft]);
+    expect(result.flow.editorStepCount).toBe(1);
+    expect(result.transitionSteps).toEqual([
+      {
+        id: "1:transition-1",
+        index: 1,
+        transitionId: "transition-1",
+        label: "Transition 1",
+        action: undefined,
+        labelingStatus: "MISSING",
+        fromState: undefined,
+        toState: undefined,
+      },
+    ]);
+  });
+
+  test("returns editor details with Neo4j transition labels in flow order", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(
+      flow({
+        transitionRefs: ["transition-1", "transition-2"],
+        stepCount: 2,
+      }),
+    );
+    mockGetTestFlowStepLabels.mockResolvedValue([
+      {
+        transitionId: "transition-2",
+        label: "Submit Checkout",
+        action: "Click checkout button",
+        labelingStatus: "COMPLETED",
+      },
+      {
+        transitionId: "transition-1",
+        label: "Open Cart",
+        action: "Click cart link",
+        labelingStatus: "COMPLETED",
+        fromState: { stateHash: "state-1", label: "Home", labelingStatus: "COMPLETED" },
+        toState: { stateHash: "state-2", label: "Cart", labelingStatus: "COMPLETED" },
+      },
+    ]);
+
+    const result = await svc.getFlowEditor("project-1", "app-1", "flow-1");
+
+    expect(mockGetTestFlowStepLabels).toHaveBeenCalledWith("session-1", ["transition-1", "transition-2"]);
+    expect(result.transitionSteps.map((step) => step.label)).toEqual(["Open Cart", "Submit Checkout"]);
+    expect(result.transitionSteps[0]).toEqual(
+      expect.objectContaining({
+        action: "Click cart link",
+        labelingStatus: "COMPLETED",
+        fromState: { stateHash: "state-1", label: "Home", labelingStatus: "COMPLETED" },
+        toState: { stateHash: "state-2", label: "Cart", labelingStatus: "COMPLETED" },
+      }),
+    );
+  });
+
+  test("uses app version graph id for coverage editor labels", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow({ testFlowType: "COVERAGE" }));
+
+    await svc.getFlowEditor("project-1", "app-1", "flow-1");
+
+    expect(mockGetTestFlowStepLabels).toHaveBeenCalledWith("version-1", ["transition-1"]);
+  });
+
+  test("falls back to deterministic editor labels when Neo4j labels fail", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow());
+    mockGetTestFlowStepLabels.mockRejectedValue(new Error("Neo4j unavailable"));
+
+    const result = await svc.getFlowEditor("project-1", "app-1", "flow-1");
+
+    expect(result.transitionSteps).toEqual([
+      expect.objectContaining({
+        transitionId: "transition-1",
+        label: "Transition 1",
+        labelingStatus: "MISSING",
+      }),
+    ]);
+  });
+
+  test("saves editor steps after validating transition anchors", async () => {
+    const draft = {
+      id: "draft-1",
+      kind: "assertion" as const,
+      position: { edge: "after" as const, transitionId: "transition-1" },
+      order: 1,
+      label: "Assert cart",
+      definition: {},
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow());
+    mockPrisma.testFlow.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await svc.saveFlowEditorSteps("project-1", "app-1", "flow-1", { editorSteps: [draft] });
+
+    expect(result.editorStepCount).toBe(1);
+    expect(mockPrisma.testFlow.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ editorSteps: [draft] }),
+      }),
+    );
+  });
+
+  test("rejects editor steps anchored to unknown transitions", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow());
+
+    await expect(
+      svc.saveFlowEditorSteps("project-1", "app-1", "flow-1", {
+        editorSteps: [
+          {
+            id: "draft-1",
+            kind: "assertion",
+            position: { edge: "after", transitionId: "missing-transition" },
+            order: 1,
+            label: "Invalid",
+            definition: {},
+            createdAt: "2026-06-22T00:00:00.000Z",
+            updatedAt: "2026-06-22T00:00:00.000Z",
+          },
+        ],
+      }),
+    ).rejects.toThrow("targets a transition");
+    expect(mockPrisma.testFlow.updateMany).not.toHaveBeenCalled();
+  });
+
+  test("connects editor sessions through the manual crawler queue", async () => {
+    mockPrisma.testFlow.findFirst.mockResolvedValue(flow());
+
+    const result = await svc.connectFlowEditor("project-1", "app-1", "flow-1", "user-1");
+
+    expect(result.editorSessionId).toBeTruthy();
+    expect(result.wsTicket).toBeTruthy();
+    expect(mockAddFlowEditorSessionJob).toHaveBeenCalledWith(result.editorSessionId, "flow-1");
+    expect(mockRedis.set).toHaveBeenCalled();
+  });
+
+  test("queues docgen generation with sorted editor steps", async () => {
+    const afterDraft = {
+      id: "draft-after",
+      kind: "assertion",
+      position: { edge: "after", transitionId: "transition-1" },
+      order: 2,
+      label: "Assert cart",
+      definition: { type: "element", assertion: "text", expectedText: { source: "store", path: "cartTotal" } },
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    const beforeDraft = {
+      id: "draft-before",
+      kind: "design-operation",
+      position: { edge: "before", transitionId: "transition-1" },
+      order: 1,
+      label: "Set cart total",
+      definition: { type: "set", key: "cartTotal", value: { literal: "$42.00" } },
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    mockPrisma.testFlow.findFirst.mockResolvedValue(
+      flow({
+        editorSteps: [afterDraft, beforeDraft],
+        generatedAt: new Date("2026-06-22T00:04:00.000Z"),
+        modifiedAt: new Date("2026-06-22T00:05:00.000Z"),
+      }),
+    );
+
+    await svc.generateTestFlow("project-1", "app-1", "flow-1", {
+      regressionCodebaseId: "codebase-1",
+      codegenConfig: { codegenBranch: "auto-tests", prTargetBranch: "main" },
+    });
+
+    expect(mockEnqueueBddGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flows: [
+          expect.objectContaining({
+            editor_steps: [beforeDraft, afterDraft],
+          }),
+        ],
+      }),
+    );
   });
 
   test("queues docgen generation for a coverage flow with app version graph id", async () => {

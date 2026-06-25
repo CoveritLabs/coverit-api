@@ -22,6 +22,7 @@ import { decryptToken, encryptToken } from "@utils/crypto";
 import { BadRequestError, NotFoundError } from "@utils/errors";
 import { buildAuthorizationUrl, exchangeAuthorizationCode, getAccessTokenExpiry, parseScopes, refreshAccessToken } from "@utils/oauth";
 import { buildRedirectUrl } from "@utils/redirect";
+import { recordProjectActivities } from "@services/projectActivity.service";
 import { getUser } from "./user.service";
 import { assertProjectExists } from "./project.service";
 
@@ -116,6 +117,20 @@ export async function completeOAuth(provider: string, code: string, stateValue: 
       refreshedAt: null,
     },
   });
+
+  await recordProjectActivities(
+    [
+      {
+        projectId: state.projectId,
+        eventType: "integration.connected",
+        entityType: "project_integration",
+        entityId: config.apiProvider,
+        message: `Connected ${config.apiProvider} integration`,
+        metadata: { provider: config.apiProvider, siteUrl: connection.jiraSiteUrl },
+      },
+    ],
+    state.userId,
+  );
 
   return buildRedirectUrl(env.FRONTEND_URL, `/projects/${state.projectId}/integrations`, {
     provider: config.apiProvider,

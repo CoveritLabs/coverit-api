@@ -58,13 +58,17 @@ function normalizeJiraReportingConfig(value: unknown): JiraReportingConfig {
   const project = config.project && typeof config.project === "object" ? config.project as Record<string, any> : undefined;
   const issueType = config.issueType && typeof config.issueType === "object" ? config.issueType as Record<string, any> : undefined;
 
+  const normalizedProject = project?.id && project?.key && project?.name
+    ? { id: String(project.id), key: String(project.key), name: String(project.name) }
+    : undefined;
+  const issueTypeProjectId = issueType?.projectId ?? normalizedProject?.id;
+  const normalizedIssueType = issueType?.id && issueType?.name && issueTypeProjectId
+    ? { id: String(issueType.id), name: String(issueType.name), projectId: String(issueTypeProjectId) }
+    : undefined;
+
   return {
-    enabled: Boolean(config.enabled && project?.id && project?.key && issueType?.id),
-    project: project?.id && project?.key && project?.name
-      ? { id: String(project.id), key: String(project.key), name: String(project.name) }
-      : undefined,
-    issueType: issueType?.id && issueType?.name
-      ? { id: String(issueType.id), name: String(issueType.name) }
-      : undefined,
+    enabled: Boolean(config.enabled && normalizedProject && normalizedIssueType),
+    project: normalizedProject,
+    issueType: normalizedIssueType,
   };
 }

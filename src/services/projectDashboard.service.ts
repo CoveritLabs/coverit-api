@@ -2,92 +2,197 @@
 // Proprietary and confidential. Unauthorized use is strictly prohibited.
 // See LICENSE file in the project root for full license information.
 
-import prisma from "@lib/prisma";
-import { TARGET_APPLICATION_MESSAGES } from "@constants/messages";
 import {
-  mapDashboardVersion,
-  mapLatestCrawlSession,
-  mapLatestRun,
-  mapLatestTestFlow,
+  CrawlStatus as PrismaCrawlStatus,
+  CrawlTriggerType as PrismaCrawlTriggerType,
+  TestFlowType as PrismaTestFlowType,
+} from "@generated/prisma/client";
+import prisma from "@lib/prisma";
+import {
+  mapCrawlSessionTrendPoint,
   mapProjectActivity,
-  toIso,
-  type DashboardVersionRow,
+  mapRunTrendPoint,
 } from "@mappers/projectDashboard.mapper";
 import type {
-  ProjectCoverageSummary,
-  ProjectDashboardResponse,
-  ProjectLatestCrawlSession,
-  ProjectLatestRun,
-  ProjectLatestTestFlow,
-  ProjectRunStatistics,
   ProjectActivity,
+  ProjectCoveragePoint,
+  ProjectDashboardResponse,
+  ProjectDashboardTotals,
+  ProjectTestFlowBreakdownPoint,
 } from "@models/projectDashboard";
-import { NotFoundError } from "@utils/errors";
 
-const LATEST_LIMIT = 5;
 const ACTIVITY_LIMIT = 10;
+const RUN_TREND_LIMIT = 14;
+const CRAWL_TREND_LIMIT = 12;
+
+type VersionRow = {
+  id: string;
+  version: string;
+  createdAt: Date;
+  targetApplication: {
+    id: string;
+    name: string;
+  };
+};
+
+type CoverageStats = {
+  totalStates: number;
+  totalTransitions: number;
+  sessionCount: number;
+  calculatedAt?: string;
+};
 
 function sumValue(value?: number | null): number {
   return value ?? 0;
 }
 
-async function resolveVersion(projectId: string, versionId?: string): Promise<DashboardVersionRow | null> {
-  const where = versionId
-    ? { id: versionId, targetApplication: { projectId } }
-    : { targetApplication: { projectId } };
-
-  const version = await prisma.targetApplicationVersion.findFirst({
-    where,
-    include: { targetApplication: { select: { id: true, name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (versionId && !version) {
-    throw new NotFoundError(TARGET_APPLICATION_MESSAGES.VERSION_NOT_FOUND);
-  }
-
-  return version;
+function percentage(coveredTransitions: number, totalTransitions: number): number {
+  if (totalTransitions <= 0) return 0;
+  return Math.min(100, Math.round((coveredTransitions / totalTransitions) * 10000) / 100);
 }
 
-async function getCoverage(version: DashboardVersionRow | null): Promise<ProjectCoverageSummary> {
-  if (!version) {
-    return { percentage: 0, coveredTransitions: 0, totalTransitions: 0 } as ProjectCoverageSummary;
-  }
+function isGenerated(generatedAt?: Date | null, modifiedAt?: Date | null): boolean {
+  if (!generatedAt) return false;
+  return !modifiedAt || generatedAt.getTime() >= modifiedAt.getTime();
+}
 
-  const session = await prisma.crawlSession.findFirst({
-    where: { appVersionId: version.id },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, transitionCount: true, createdAt: true },
+function isStale(generatedAt?: Date | null, modifiedAt?: Date | null): boolean {
+  return Boolean(generatedAt && modifiedAt && modifiedAt.getTime() > generatedAt.getTime());
+}
+
+async function getVersions(projectId: string): Promise<VersionRow[]> {
+  return prisma.targetApplicationVersion.findMany({
+    where: { targetApplication: { projectId } },
+    orderBy: [{ targetApplication: { name: "asc" } }, { createdAt: "desc" }],
+    include: { targetApplication: { select: { id: true, name: true } } },
+  });
+}
+
+function latestVersionByApplication(versions: VersionRow[]): Map<string, VersionRow> {
+  const latest = new Map<string, VersionRow>();
+  for (const version of versions) {
+    const existing = latest.get(version.targetApplication.id);
+    if (!existing || version.createdAt.getTime() > existing.createdAt.getTime()) {
+      latest.set(version.targetApplication.id, version);
+    }
+  }
+  return latest;
+}
+
+async function getCoverageStats(projectId: string): Promise<Map<string, CoverageStats>> {
+  const sessions = await prisma.crawlSession.findMany({
+    where: {
+      status: PrismaCrawlStatus.COMPLETED,
+      triggerType: PrismaCrawlTriggerType.ON_DEMAND,
+      appVersion: { targetApplication: { projectId } },
+    },
+    select: {
+      appVersionId: true,
+      stateCount: true,
+      transitionCount: true,
+      finishedAt: true,
+      createdAt: true,
+    },
   });
 
-  if (!session || session.transitionCount <= 0) {
-    return {
-      percentage: 0,
-      coveredTransitions: 0,
-      totalTransitions: session?.transitionCount ?? 0,
-      crawlSessionId: session?.id,
-      calculatedAt: toIso(session?.createdAt),
-    } as ProjectCoverageSummary;
+  const byVersion = new Map<string, CoverageStats>();
+  for (const session of sessions) {
+    const current = byVersion.get(session.appVersionId) ?? {
+      totalStates: 0,
+      totalTransitions: 0,
+      sessionCount: 0,
+      calculatedAt: undefined,
+    };
+    const calculatedAt = session.finishedAt ?? session.createdAt;
+    if (!current.calculatedAt || calculatedAt.getTime() > new Date(current.calculatedAt).getTime()) {
+      current.calculatedAt = calculatedAt.toISOString();
+    }
+    current.totalStates += session.stateCount;
+    current.totalTransitions += session.transitionCount;
+    current.sessionCount += 1;
+    byVersion.set(session.appVersionId, current);
   }
 
+  return byVersion;
+}
+
+async function getCoveredTransitions(projectId: string): Promise<Map<string, Set<string>>> {
   const flows = await prisma.testFlow.findMany({
-    where: { crawlSessionId: session.id },
-    select: { transitionRefs: true },
+    where: {
+      testFlowType: PrismaTestFlowType.COVERAGE,
+      appVersion: { targetApplication: { projectId } },
+    },
+    select: {
+      appVersionId: true,
+      transitionRefs: true,
+    },
   });
-  const coveredTransitions = new Set(flows.flatMap((flow) => flow.transitionRefs)).size;
-  const percentage = Math.min(100, Math.round((coveredTransitions / session.transitionCount) * 10000) / 100);
+
+  const byVersion = new Map<string, Set<string>>();
+  for (const flow of flows) {
+    const refs = byVersion.get(flow.appVersionId) ?? new Set<string>();
+    for (const ref of flow.transitionRefs) {
+      refs.add(ref);
+    }
+    byVersion.set(flow.appVersionId, refs);
+  }
+  return byVersion;
+}
+
+function buildCoveragePoint(
+  version: VersionRow,
+  stats: CoverageStats | undefined,
+  coveredRefs: Set<string> | undefined,
+): ProjectCoveragePoint {
+  const coveredTransitions = coveredRefs?.size ?? 0;
+  const totalTransitions = stats?.totalTransitions ?? 0;
+  return {
+    applicationId: version.targetApplication.id,
+    applicationName: version.targetApplication.name,
+    versionId: version.id,
+    version: version.version,
+    percentage: percentage(coveredTransitions, totalTransitions),
+    coveredTransitions,
+    totalTransitions,
+    totalStates: stats?.totalStates ?? 0,
+    sessionCount: stats?.sessionCount ?? 0,
+    calculatedAt: stats?.calculatedAt,
+  };
+}
+
+async function getCoverage(projectId: string): Promise<{
+  byApplication: ProjectCoveragePoint[];
+  byVersion: ProjectCoveragePoint[];
+}> {
+  const [versions, statsByVersion, coveredByVersion] = await Promise.all([
+    getVersions(projectId),
+    getCoverageStats(projectId),
+    getCoveredTransitions(projectId),
+  ]);
+
+  const byVersion = versions.map((version) =>
+    buildCoveragePoint(version, statsByVersion.get(version.id), coveredByVersion.get(version.id)),
+  );
+  const latest = latestVersionByApplication(versions);
+  const latestIds = new Set([...latest.values()].map((version) => version.id));
 
   return {
-    percentage,
-    coveredTransitions,
-    totalTransitions: session.transitionCount,
-    crawlSessionId: session.id,
-    calculatedAt: session.createdAt.toISOString(),
-  } as ProjectCoverageSummary;
+    byApplication: byVersion.filter((point) => latestIds.has(point.versionId)),
+    byVersion,
+  };
 }
 
-async function getRunStatistics(projectId: string): Promise<ProjectRunStatistics> {
-  const [totals, reportedWarningCount, reportedFailedCount] = await Promise.all([
+async function getTotals(projectId: string): Promise<ProjectDashboardTotals> {
+  const [sessionTotals, runTotals, reportedWarningCount, reportedFailedCount] = await Promise.all([
+    prisma.crawlSession.aggregate({
+      where: {
+        status: PrismaCrawlStatus.COMPLETED,
+        triggerType: PrismaCrawlTriggerType.ON_DEMAND,
+        appVersion: { targetApplication: { projectId } },
+      },
+      _count: { _all: true },
+      _sum: { stateCount: true, transitionCount: true },
+    }),
     prisma.regressionRun.aggregate({
       where: { targetApplication: { projectId } },
       _count: { _all: true },
@@ -102,34 +207,41 @@ async function getRunStatistics(projectId: string): Promise<ProjectRunStatistics
   ]);
 
   return {
-    passedCount: sumValue(totals._sum?.passedCount),
-    warningCount: sumValue(totals._sum?.warningCount),
-    failedCount: sumValue(totals._sum?.failedCount),
+    totalStates: sumValue(sessionTotals._sum?.stateCount),
+    totalTransitions: sumValue(sessionTotals._sum?.transitionCount),
+    totalOnDemandSessions: sessionTotals._count?._all ?? 0,
+    totalRuns: runTotals._count?._all ?? 0,
+    passedCount: sumValue(runTotals._sum?.passedCount),
+    warningCount: sumValue(runTotals._sum?.warningCount),
+    failedCount: sumValue(runTotals._sum?.failedCount),
     reportedWarningCount,
     reportedFailedCount,
-    totalRuns: totals._count?._all ?? 0,
-  } as ProjectRunStatistics;
+  };
 }
 
-async function getLatestRuns(projectId: string): Promise<ProjectLatestRun[]> {
+async function getRunTrend(projectId: string) {
   const rows = await prisma.regressionRun.findMany({
     where: { targetApplication: { projectId } },
     orderBy: { createdAt: "desc" },
-    take: LATEST_LIMIT,
+    take: RUN_TREND_LIMIT,
     include: {
       targetApplication: { select: { id: true, name: true } },
       version: { select: { id: true, version: true } },
     },
   });
 
-  return rows.map(mapLatestRun);
+  return rows.reverse().map(mapRunTrendPoint);
 }
 
-async function getLatestCrawlSessions(projectId: string): Promise<ProjectLatestCrawlSession[]> {
+async function getCrawlSessionTrend(projectId: string) {
   const rows = await prisma.crawlSession.findMany({
-    where: { appVersion: { targetApplication: { projectId } } },
+    where: {
+      status: PrismaCrawlStatus.COMPLETED,
+      triggerType: PrismaCrawlTriggerType.ON_DEMAND,
+      appVersion: { targetApplication: { projectId } },
+    },
     orderBy: { createdAt: "desc" },
-    take: LATEST_LIMIT,
+    take: CRAWL_TREND_LIMIT,
     include: {
       appVersion: {
         select: {
@@ -141,26 +253,44 @@ async function getLatestCrawlSessions(projectId: string): Promise<ProjectLatestC
     },
   });
 
-  return rows.map(mapLatestCrawlSession);
+  return rows.reverse().map(mapCrawlSessionTrendPoint);
 }
 
-async function getLatestTestFlows(projectId: string): Promise<ProjectLatestTestFlow[]> {
+async function getTestFlowBreakdown(projectId: string): Promise<ProjectTestFlowBreakdownPoint[]> {
   const rows = await prisma.testFlow.findMany({
     where: { appVersion: { targetApplication: { projectId } } },
-    orderBy: { createdAt: "desc" },
-    take: LATEST_LIMIT,
-    include: {
-      appVersion: {
-        select: {
-          id: true,
-          version: true,
-          targetApplication: { select: { id: true, name: true } },
-        },
-      },
+    select: {
+      testFlowType: true,
+      stepCount: true,
+      generatedAt: true,
+      modifiedAt: true,
     },
   });
 
-  return rows.map(mapLatestTestFlow);
+  const byType = new Map<string, ProjectTestFlowBreakdownPoint>();
+  for (const row of rows) {
+    const type = row.testFlowType.toLowerCase();
+    const point = byType.get(type) ?? {
+      type,
+      count: 0,
+      totalSteps: 0,
+      generatedCount: 0,
+      staleCount: 0,
+      pendingCount: 0,
+    };
+    point.count += 1;
+    point.totalSteps += row.stepCount;
+    if (isGenerated(row.generatedAt, row.modifiedAt)) {
+      point.generatedCount += 1;
+    } else if (isStale(row.generatedAt, row.modifiedAt)) {
+      point.staleCount += 1;
+    } else {
+      point.pendingCount += 1;
+    }
+    byType.set(type, point);
+  }
+
+  return [...byType.values()].sort((a, b) => a.type.localeCompare(b.type));
 }
 
 async function getRecentActivities(projectId: string): Promise<ProjectActivity[]> {
@@ -173,24 +303,23 @@ async function getRecentActivities(projectId: string): Promise<ProjectActivity[]
   return rows.map(mapProjectActivity);
 }
 
-export async function getProjectDashboard(projectId: string, versionId?: string): Promise<ProjectDashboardResponse> {
-  const selectedVersion = await resolveVersion(projectId, versionId);
-  const [coverage, runStatistics, latestRuns, latestCrawlSessions, latestTestFlows, recentActivities] = await Promise.all([
-    getCoverage(selectedVersion),
-    getRunStatistics(projectId),
-    getLatestRuns(projectId),
-    getLatestCrawlSessions(projectId),
-    getLatestTestFlows(projectId),
+export async function getProjectDashboard(projectId: string): Promise<ProjectDashboardResponse> {
+  const [totals, coverage, runTrend, crawlSessionTrend, testFlowBreakdown, recentActivities] = await Promise.all([
+    getTotals(projectId),
+    getCoverage(projectId),
+    getRunTrend(projectId),
+    getCrawlSessionTrend(projectId),
+    getTestFlowBreakdown(projectId),
     getRecentActivities(projectId),
   ]);
 
   return {
-    selectedVersion: selectedVersion ? mapDashboardVersion(selectedVersion) : undefined,
-    coverage,
-    runStatistics,
-    latestRuns,
-    latestCrawlSessions,
-    latestTestFlows,
+    totals,
+    coverageByApplication: coverage.byApplication,
+    coverageByVersion: coverage.byVersion,
+    runTrend,
+    crawlSessionTrend,
+    testFlowBreakdown,
     recentActivities,
-  } as ProjectDashboardResponse;
+  };
 }

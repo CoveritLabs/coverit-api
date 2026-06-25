@@ -9,6 +9,7 @@ import prisma from "@lib/prisma";
 import redis from "@lib/redis";
 import { verifyNeo4jConnection } from "@lib/neo4j";
 import { env } from "@config/env";
+import { setupFlowEditorWebSockets } from "./ws/flowEditorBroker";
 import { setupManualSessionWebSockets } from "./ws/manualSessionBroker";
 
 async function startServer(): Promise<void> {
@@ -44,6 +45,7 @@ async function startServer(): Promise<void> {
 
   const server = createServer(app);
   setupManualSessionWebSockets(server);
+  setupFlowEditorWebSockets(server);
 
   server.listen(env.PORT, () => {
     console.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);

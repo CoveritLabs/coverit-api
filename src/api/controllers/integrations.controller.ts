@@ -48,6 +48,14 @@ export async function updateReportingConfig(req: Request, res: Response, next: N
     const { projectId, provider } = req.params;
     const body = UpdateIntegrationReportingConfigBodySchema.parse(req.body);
     const response = await integrationsService.updateReportingConfig(projectId, provider, body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "integration.reporting_config_updated",
+      entityType: "project_integration",
+      entityId: provider,
+      message: `Updated ${provider} reporting configuration`,
+      metadata: { provider },
+    });
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
@@ -58,6 +66,14 @@ export async function disconnectIntegration(req: Request, res: Response, next: N
   try {
     const { projectId, provider } = req.params;
     const response = await integrationsService.disconnectIntegration(projectId, provider);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "integration.disconnected",
+      entityType: "project_integration",
+      entityId: provider,
+      message: `Disconnected ${provider} integration`,
+      metadata: { provider },
+    });
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
     next(err);
