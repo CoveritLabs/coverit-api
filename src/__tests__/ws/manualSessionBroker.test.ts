@@ -6,7 +6,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 describe("manualSessionBroker websocket allowlists", () => {
-  const source = readFileSync(join(__dirname, "../../ws/manualSessionBroker.ts"), "utf8");
+  const source = readFileSync(join(__dirname, "../../websockets/manualSessionBroker.ts"), "utf8");
 
   test("allows manual flow completion and bug reporting messages", () => {
     expect(source).toContain('"flow.finish"');
@@ -19,6 +19,11 @@ describe("manualSessionBroker websocket allowlists", () => {
     expect(source).toContain('"flow.rewind"');
     expect(source).toContain('"flow.rewound"');
     expect(source).toContain('"recorded.step"');
+  });
+
+  test("allows manual pending publish messages", () => {
+    expect(source).toContain('"flow.publish_pending"');
+    expect(source).toContain('"flow.pending_published"');
   });
 
   test("allows manual session ttl messages from the crawler", () => {
