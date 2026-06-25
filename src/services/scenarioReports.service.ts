@@ -164,8 +164,9 @@ export async function createManualBugReport(
   const now = new Date();
   const publicRunId = `manual-bug-${body.sessionId}`;
   const scenarioKey = `manual-bug:${body.flowId}`;
-  const title = body.summary.trim();
-  const description = manualBugDescription(body);
+  const bugReport = parseManualBugSummary(body.summary);
+  const title = bugReport.title;
+  const description = manualBugDescription(body, bugReport.description);
   const runName = `${MANUAL_BUG_RUN_NAME} ${body.sessionId.slice(0, 8)}`;
 
   const report = await (prisma as any).$transaction(async (tx: any) => {
@@ -262,7 +263,7 @@ export async function createManualBugReport(
     flow_id: body.flowId,
     checkpoint_hash: body.checkpointHash,
     transition_ids: body.transitionIds,
-    summary: body.summary,
+    summary: title,
     severity: body.severity,
     current_url: body.currentUrl,
     recorded_events: body.recordedEvents,
@@ -351,6 +352,10 @@ export async function getScenarioReportContext(reportId: string): Promise<Intern
     where: { id: { in: report.artifactIds ?? [] }, runDbId: report.runDbId },
     orderBy: { createdAt: "asc" },
   });
+  const run = await (prisma as any).regressionRun.findUnique({
+    where: { id: report.runDbId },
+    include: { targetApplication: { select: { name: true } } },
+  });
 
   return {
     report: mapScenarioIntegrationReport(report),
@@ -369,6 +374,7 @@ export async function getScenarioReportContext(reportId: string): Promise<Intern
       sizeBytes: artifact.sizeBytes == null ? undefined : Number(artifact.sizeBytes),
     })),
     structuredDescription: mapStructuredScenarioReportDescription(report),
+    applicationName: run?.targetApplication?.name,
   };
 }
 
@@ -428,9 +434,16 @@ async function assertScenarioArtifacts(runDbId: string, scenario: any, artifactI
   }
 }
 
-function manualBugDescription(body: InternalCreateManualBugReportBody): string {
+function parseManualBugSummary(summary: string): { title: string; description: string } {
+  const [titleLine = "", ...descriptionLines] = summary.trim().split(/\r?\n/);
+  const title = titleLine.trim() || "Untitled bug report";
+  const description = descriptionLines.join("\n").trim();
+  return { title, description };
+}
+
+function manualBugDescription(body: InternalCreateManualBugReportBody, description: string): string {
   const lines = [
-    body.summary.trim(),
+    description || parseManualBugSummary(body.summary).title,
     "",
     `Severity: ${body.severity}`,
     ...(body.currentUrl ? [`Current URL: ${body.currentUrl}`] : []),

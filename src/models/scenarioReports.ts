@@ -48,7 +48,7 @@ export const InternalCreateManualBugReportBodySchema = z.object({
   flowId: z.uuid(),
   checkpointHash: z.requiredString("checkpointHash is required"),
   transitionIds: z.array(z.requiredString("transition id is required")).min(1),
-  summary: z.requiredString(SCENARIO_REPORT_VALIDATION.TITLE_REQUIRED).max(500),
+  summary: z.requiredString(SCENARIO_REPORT_VALIDATION.TITLE_REQUIRED).max(4000),
   severity: z.requiredString("severity is required").max(50),
   currentUrl: z.string().max(2048).optional().default(""),
   recordedEvents: z.array(z.unknown()).optional().default([]),
@@ -132,6 +132,7 @@ export const InternalScenarioReportContextResponseSchema = z.object({
   reportingConfig: z.unknown(),
   artifacts: z.array(InternalScenarioReportArtifactSchema),
   structuredDescription: StructuredScenarioReportDescriptionSchema,
+  applicationName: z.string().optional(),
 });
 
 export type ScenarioIntegrationReportProvider = ZodInfer<typeof ScenarioIntegrationReportProviderSchema>;
@@ -197,4 +198,5 @@ export type InternalScenarioReportContextResponse = Omit<
   reportingConfig: unknown;
   artifacts: InternalScenarioReportArtifact[];
   structuredDescription: StructuredScenarioReportDescription;
+  applicationName?: string;
 };
