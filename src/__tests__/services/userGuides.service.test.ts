@@ -3,8 +3,8 @@
 // See LICENSE file in the project root for full license information.
 
 jest.mock("@services/crawlSession.service", () => ({
-  getSessionDetails: jest.fn(),
-  getSessions: jest.fn(),
+  requireApplicationVersion: jest.fn(),
+  requireTargetApplication: jest.fn(),
 }));
 jest.mock("@lib/neo4j", () => ({
   getNeo4jReadSession: jest.fn(),
@@ -25,16 +25,16 @@ jest.mock("@queues/arq/docgenArq", () => ({
 import { getNeo4jReadSession } from "@lib/neo4j";
 import redis from "@lib/redis";
 import { enqueueUserGuidesGeneration } from "@queues/arq/docgenArq";
-import { getSessionDetails, getSessions } from "@services/crawlSession.service";
+import { requireApplicationVersion, requireTargetApplication } from "@services/crawlSession.service";
 import * as svc from "@services/userGuides.service";
-import { BadRequestError, NotFoundError } from "@utils/errors";
+import { BadRequestError } from "@utils/errors";
 
 const HASH_A = "a".repeat(64);
 const HASH_B = "b".repeat(64);
 const HASH_C = "c".repeat(64);
 
-const mockGetSessionDetails = getSessionDetails as jest.Mock;
-const mockGetSessions = getSessions as jest.Mock;
+const mockRequireTargetApplication = requireTargetApplication as jest.Mock;
+const mockRequireApplicationVersion = requireApplicationVersion as jest.Mock;
 const mockGetNeo4jReadSession = getNeo4jReadSession as jest.Mock;
 const mockRedisGet = redis.get as jest.Mock;
 const mockEnqueueUserGuidesGeneration = enqueueUserGuidesGeneration as jest.Mock;
@@ -59,16 +59,11 @@ function mockNeo4jRecords(records: Array<ReturnType<typeof record>>) {
 describe("userGuides.service", () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockGetSessionDetails.mockResolvedValue({ id: "session-1" });
-    mockGetSessions.mockResolvedValue({
-      sessions: [{ id: "latest-session", createdAt: "2026-06-23T00:00:00.000Z" }],
-      totalCount: 1,
-      currentPage: 1,
-      pageSize: 1,
-    });
+    mockRequireTargetApplication.mockResolvedValue({ id: "app-1" });
+    mockRequireApplicationVersion.mockResolvedValue({ id: "version-1" });
   });
 
-  test("lists user guide states from Neo4j after validating crawl session scope", async () => {
+  test("lists user guide states from Neo4j after validating version scope", async () => {
     const { run, session } = mockNeo4jRecords([
       record({
         stateHash: HASH_A,
@@ -84,11 +79,12 @@ describe("userGuides.service", () => {
       }),
     ]);
 
-    const result = await svc.getUserGuideStates("project-1", "app-1", "version-1", "session-1");
+    const result = await svc.getUserGuideStates("project-1", "app-1", "version-1");
 
-    expect(mockGetSessionDetails).toHaveBeenCalledWith("project-1", "app-1", "version-1", "session-1");
-    expect(run).toHaveBeenCalledWith(expect.stringContaining("MATCH (s:State {session_id: $sessionId})"), {
-      sessionId: "session-1",
+    expect(mockRequireTargetApplication).toHaveBeenCalledWith("project-1", "app-1");
+    expect(mockRequireApplicationVersion).toHaveBeenCalledWith("app-1", "version-1");
+    expect(run).toHaveBeenCalledWith(expect.stringContaining("MATCH (s:State {graph_id: $versionId})"), {
+      versionId: "version-1",
     });
     expect(session.close).toHaveBeenCalled();
     expect(result.states).toEqual([
@@ -109,29 +105,11 @@ describe("userGuides.service", () => {
     ]);
   });
 
-  test("lists states for the newest crawl session in a version", async () => {
-    const { run } = mockNeo4jRecords([record({ stateHash: HASH_A, label: "Home" })]);
-
-    const result = await svc.getUserGuideStatesForVersion("project-1", "app-1", "version-1");
-
-    expect(mockGetSessions).toHaveBeenCalledWith("project-1", "app-1", "version-1", { page: 1, pageSize: 1 });
-    expect(mockGetSessionDetails).toHaveBeenCalledWith("project-1", "app-1", "version-1", "latest-session");
-    expect(run).toHaveBeenCalledWith(expect.any(String), { sessionId: "latest-session" });
-    expect(result.states).toEqual([{ stateHash: HASH_A, label: "Home", path: undefined, title: undefined, url: undefined }]);
-  });
-
-  test("rejects version-scoped state listing when no crawl session exists", async () => {
-    mockGetSessions.mockResolvedValue({ sessions: [], totalCount: 0, currentPage: 1, pageSize: 1 });
-
-    await expect(svc.getUserGuideStatesForVersion("project-1", "app-1", "version-1")).rejects.toThrow(NotFoundError);
-    expect(mockGetNeo4jReadSession).not.toHaveBeenCalled();
-  });
-
-  test("rejects generation when either state hash is outside the selected crawl session", async () => {
+  test("rejects generation when either state hash is outside the selected version graph", async () => {
     mockNeo4jRecords([record({ stateHash: HASH_A, label: "Home" })]);
 
     await expect(
-      svc.generateUserGuide("project-1", "app-1", "version-1", "session-1", {
+      svc.generateUserGuide("project-1", "app-1", "version-1", {
         startStateHash: HASH_A,
         endStateHash: HASH_B,
       }),
@@ -147,13 +125,13 @@ describe("userGuides.service", () => {
     mockEnqueueUserGuidesGeneration.mockResolvedValue("job-1");
     mockRedisGet.mockResolvedValue(JSON.stringify({ status: "completed", userGuide: "Line one\nLine two" }));
 
-    const result = await svc.generateUserGuide("project-1", "app-1", "version-1", "session-1", {
+    const result = await svc.generateUserGuide("project-1", "app-1", "version-1", {
       startStateHash: HASH_A,
       endStateHash: HASH_C,
     });
 
     expect(mockEnqueueUserGuidesGeneration).toHaveBeenCalledWith({
-      session_id: "session-1",
+      graph_id: "version-1",
       start_state_hash: HASH_A,
       end_state_hash: HASH_C,
     });
@@ -162,26 +140,6 @@ describe("userGuides.service", () => {
       message: "User guide generation completed",
       userGuide: "Line one\nLine two",
       error: undefined,
-    });
-  });
-
-  test("version-scoped generation queues docgen with the resolved newest session id", async () => {
-    mockNeo4jRecords([
-      record({ stateHash: HASH_A, label: "Home" }),
-      record({ stateHash: HASH_C, label: "Checkout" }),
-    ]);
-    mockEnqueueUserGuidesGeneration.mockResolvedValue("job-2");
-    mockRedisGet.mockResolvedValue(JSON.stringify({ status: "completed", userGuide: "Guide" }));
-
-    await svc.generateUserGuideForVersion("project-1", "app-1", "version-1", {
-      startStateHash: HASH_A,
-      endStateHash: HASH_C,
-    });
-
-    expect(mockEnqueueUserGuidesGeneration).toHaveBeenCalledWith({
-      session_id: "latest-session",
-      start_state_hash: HASH_A,
-      end_state_hash: HASH_C,
     });
   });
 });

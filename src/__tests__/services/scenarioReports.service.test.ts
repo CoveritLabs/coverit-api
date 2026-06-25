@@ -12,6 +12,9 @@ jest.mock("@services/notifications.service", () => ({
 jest.mock("@queues/arq/docgenArq", () => ({
   enqueueManualBugReport: jest.fn(),
 }));
+jest.mock("@services/projectActivity.service", () => ({
+  recordProjectActivities: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import { SCENARIO_REPORT_MESSAGES } from "@constants/messages";
@@ -19,6 +22,7 @@ import { getUser } from "@services/user.service";
 import { getValidJiraAccess } from "@services/integrations.service";
 import { notifyScenarioReportUpdated } from "@services/notifications.service";
 import { enqueueManualBugReport } from "@queues/arq/docgenArq";
+import { recordProjectActivities } from "@services/projectActivity.service";
 import * as svc from "@services/scenarioReports.service";
 
 const mockPrisma = prisma as any;
@@ -26,10 +30,11 @@ const mockGetUser = getUser as jest.Mock;
 const mockGetValidJiraAccess = getValidJiraAccess as jest.Mock;
 const mockNotifyScenarioReportUpdated = notifyScenarioReportUpdated as jest.Mock;
 const mockEnqueueManualBugReport = enqueueManualBugReport as jest.Mock;
+const mockRecordProjectActivities = recordProjectActivities as jest.Mock;
 
 const now = new Date("2026-06-19T12:00:00.000Z");
 const app = { id: "app1", projectId: "p1" };
-const run = { id: "run-db-1", runId: "run-1", targetApplicationId: "app1" };
+const run = { id: "run-db-1", runId: "run-1", targetApplicationId: "app1", targetApplication: { name: "Shop" } };
 const failedScenario = {
   id: "scenario-1",
   runDbId: "run-db-1",
@@ -254,6 +259,7 @@ describe("scenarioReports.service", () => {
         { key: "source", type: "metadata", title: "Source", text: "Generated automatically by CoverIt" },
       ],
     });
+    expect(response.applicationName).toBe("Shop");
   });
 
   test("delegates notification handling after patching a report", async () => {
@@ -339,7 +345,78 @@ describe("scenarioReports.service", () => {
         transition_ids: ["transition-1"],
       }),
     );
+    expect(mockRecordProjectActivities).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          projectId: "p1",
+          eventType: "manual_bug_report.queued",
+          entityType: "scenario_integration_report",
+          entityId: "manual-report-1",
+          metadata: expect.objectContaining({
+            applicationId: "app1",
+            versionId: "version-1",
+            sessionId: "11111111-1111-4111-8111-111111111111",
+            flowId: "22222222-2222-4222-8222-222222222222",
+            jobId: "docgen:manual-bug:job-1",
+          }),
+        }),
+      ],
+      "u1",
+    );
     expect(response).toMatchObject({ report: { id: "manual-report-1" }, jobId: "docgen:manual-bug:job-1" });
+  });
+
+  test("uses first manual bug summary line as title and remaining lines as description", async () => {
+    mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(
+      report({
+        id: "manual-report-1",
+        title: "Checkout fails",
+        description:
+          "Button never submits\nUser remains on cart\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
+        runDbId: "manual-run-db-1",
+        scenarioId: "manual-scenario-1",
+        artifactIds: [],
+      }),
+    );
+
+    await svc.createManualBugReport({
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      flowId: "22222222-2222-4222-8222-222222222222",
+      checkpointHash: "state-1",
+      transitionIds: ["transition-1"],
+      summary: "Checkout fails\nButton never submits\nUser remains on cart",
+      severity: "high",
+      currentUrl: "https://app.test/cart",
+      recordedEvents: [],
+      provider: "jira",
+    });
+
+    expect(mockPrisma.regressionScenario.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          scenarioName: "Checkout fails",
+          title: "Checkout fails",
+        }),
+        update: expect.objectContaining({
+          scenarioName: "Checkout fails",
+          title: "Checkout fails",
+        }),
+      }),
+    );
+    expect(mockPrisma.scenarioIntegrationReport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Checkout fails",
+          description:
+            "Button never submits\nUser remains on cart\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
+        }),
+      }),
+    );
+    expect(mockEnqueueManualBugReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: "Checkout fails",
+      }),
+    );
   });
 
   test("generic scenario report claim skips manual bug reports", async () => {

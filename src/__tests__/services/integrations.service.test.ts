@@ -29,15 +29,20 @@ jest.mock("@config/env", () => ({
     OAUTH_STATE_TTL_SECONDS: 600,
   },
 }));
+jest.mock("@services/projectActivity.service", () => ({
+  recordProjectActivities: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import * as cache from "@lib/cache";
 import * as svc from "@services/integrations.service";
 import { INTEGRATIONS_MESSAGES } from "@constants/messages";
 import { decryptToken, encryptToken } from "@utils/crypto";
+import { recordProjectActivities } from "@services/projectActivity.service";
 
 const mockPrisma = prisma as any;
 const mockCache = cache as any;
+const mockRecordProjectActivities = recordProjectActivities as jest.Mock;
 
 describe("integrations.service", () => {
   beforeEach(() => {
@@ -117,6 +122,18 @@ describe("integrations.service", () => {
     expect(createData.encryptedAccessToken).not.toBe("access-token");
     expect(decryptToken(createData.encryptedAccessToken)).toBe("access-token");
     expect(decryptToken(createData.encryptedRefreshToken)).toBe("refresh-token");
+    expect(mockRecordProjectActivities).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          projectId: "p1",
+          eventType: "integration.connected",
+          entityType: "project_integration",
+          entityId: "jira",
+          metadata: expect.objectContaining({ provider: "jira", siteUrl: "https://site.atlassian.net" }),
+        }),
+      ],
+      "u1",
+    );
   });
 
   test("completeOAuth rejects ambiguous Jira site selection", async () => {
@@ -144,6 +161,7 @@ describe("integrations.service", () => {
 
     await expect(svc.completeOAuth("jira", "code", "state")).rejects.toThrow(INTEGRATIONS_MESSAGES.OAUTH_MULTIPLE_JIRA_SITES);
     expect(mockPrisma.projectIntegration.upsert).not.toHaveBeenCalled();
+    expect(mockRecordProjectActivities).not.toHaveBeenCalled();
   });
 
   test("getIntegrationStatus returns non-secret disconnected and connected status", async () => {
@@ -238,5 +256,95 @@ describe("integrations.service", () => {
     );
     const updateData = mockPrisma.projectIntegration.update.mock.calls[0][0].data;
     expect(decryptToken(updateData.encryptedRefreshToken)).toBe("new-refresh");
+  });
+
+  test("getReportingOptions returns Jira issue types scoped to each project", async () => {
+    mockPrisma.projectIntegration.findUnique.mockResolvedValue({
+      jiraCloudId: "cloud-1",
+      jiraSiteUrl: "https://site.atlassian.net",
+      tokenType: "Bearer",
+      encryptedAccessToken: encryptToken("access-token"),
+      encryptedRefreshToken: null,
+      accessTokenExpiresAt: new Date(Date.now() + 3_600_000),
+    });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        values: [
+          {
+            id: "10000",
+            key: "COV",
+            name: "CoverIt",
+            issueTypes: [{ id: "1", name: "Bug" }],
+          },
+          {
+            id: "20000",
+            key: "SHOP",
+            name: "Shop",
+            issueTypes: [{ id: "1", name: "Bug" }],
+          },
+        ],
+      }),
+    });
+
+    const response = await svc.getReportingOptions("p1", "jira");
+
+    expect(response.options).toEqual({
+      case: "jira",
+      value: {
+        projects: [
+          { id: "10000", key: "COV", name: "CoverIt" },
+          { id: "20000", key: "SHOP", name: "Shop" },
+        ],
+        issueTypes: [
+          { id: "1", name: "Bug", projectId: "10000" },
+          { id: "1", name: "Bug", projectId: "20000" },
+        ],
+      },
+    });
+  });
+
+  test("updateReportingConfig rejects Jira issue types from another project", async () => {
+    mockPrisma.projectIntegration.findUnique.mockResolvedValue({
+      jiraCloudId: "cloud-1",
+      jiraSiteUrl: "https://site.atlassian.net",
+      tokenType: "Bearer",
+      encryptedAccessToken: encryptToken("access-token"),
+      encryptedRefreshToken: null,
+      accessTokenExpiresAt: new Date(Date.now() + 3_600_000),
+    });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        values: [
+          {
+            id: "10000",
+            key: "COV",
+            name: "CoverIt",
+            issueTypes: [{ id: "1", name: "Task" }],
+          },
+          {
+            id: "20000",
+            key: "SHOP",
+            name: "Shop",
+            issueTypes: [{ id: "2", name: "Bug" }],
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      svc.updateReportingConfig("p1", "jira", {
+        config: {
+          case: "jira",
+          value: {
+            enabled: true,
+            project: { id: "10000", key: "COV", name: "CoverIt" },
+            issueType: { id: "2", name: "Bug", projectId: "20000" },
+          },
+        },
+      }),
+    ).rejects.toThrow(INTEGRATIONS_MESSAGES.JIRA_REPORTING_CONFIG_INVALID);
+    expect(mockPrisma.projectIntegration.update).not.toHaveBeenCalled();
   });
 });
