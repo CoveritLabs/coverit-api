@@ -69,6 +69,7 @@ describe("notifications.service", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     mockPrisma.crawlSession.findUnique.mockResolvedValue(session);
+    mockPrisma.testFlow.updateMany.mockResolvedValue({ count: 1 });
   });
 
   test("enqueues framework generated email for session creator", async () => {
@@ -79,8 +80,16 @@ describe("notifications.service", () => {
       noChanges: false,
       pushed: true,
       pullRequestUrl: "https://github.com/acme/shop/pull/1",
+      flowIds: ["flow-1"],
     });
 
+    expect(mockPrisma.testFlow.updateMany).toHaveBeenCalledWith({
+      where: {
+        crawlSessionId: session.id,
+        id: { in: ["flow-1"] },
+      },
+      data: { generatedAt: expect.any(Date) },
+    });
     expect(mockEnqueueFrameworkGeneratedEmail).toHaveBeenCalledWith({
       email: "creator@example.com",
       name: "Creator",

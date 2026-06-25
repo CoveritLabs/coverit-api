@@ -76,7 +76,7 @@ async function getJiraReportingOptions(access: JiraAccess): Promise<IntegrationR
     "/rest/api/3/project/search?expand=issueTypes&maxResults=100",
   );
   const projects: JiraReportingProject[] = [];
-  const issueTypeMap = new Map<string, JiraReportingIssueType>();
+  const issueTypes: JiraReportingIssueType[] = [];
 
   for (const project of response.values ?? []) {
     if (!project.id || !project.key || !project.name) continue;
@@ -84,7 +84,7 @@ async function getJiraReportingOptions(access: JiraAccess): Promise<IntegrationR
 
     for (const issueType of project.issueTypes ?? []) {
       if (!issueType.id || !issueType.name) continue;
-      issueTypeMap.set(issueType.id, { id: issueType.id, name: issueType.name });
+      issueTypes.push({ id: issueType.id, name: issueType.name, projectId: project.id });
     }
   }
 
@@ -92,7 +92,7 @@ async function getJiraReportingOptions(access: JiraAccess): Promise<IntegrationR
     case: "jira",
     value: {
       projects,
-      issueTypes: [...issueTypeMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      issueTypes: issueTypes.sort((a, b) => a.projectId.localeCompare(b.projectId) || a.name.localeCompare(b.name)),
     },
   };
 }
@@ -107,7 +107,9 @@ async function normalizeJiraReportingConfig(input: unknown, access: JiraAccess):
     throw new BadRequestError(INTEGRATIONS_MESSAGES.JIRA_REPORTING_CONFIG_INVALID);
   }
   const project = options.value.projects.find((candidate) => candidate.id === projectInput.id || candidate.key === projectInput.key);
-  const issueType = options.value.issueTypes.find((candidate) => candidate.id === issueTypeInput.id);
+  const issueType = options.value.issueTypes.find(
+    (candidate) => candidate.id === issueTypeInput.id && candidate.projectId === project?.id,
+  );
 
   if (!project || !issueType) {
     throw new BadRequestError(INTEGRATIONS_MESSAGES.JIRA_REPORTING_CONFIG_INVALID);

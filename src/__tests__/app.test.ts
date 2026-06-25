@@ -7,21 +7,21 @@ jest.mock("@config/env", () => ({
     CORS_ORIGINS: ["http://localhost:5173", "http://example.com"],
     CORS_CREDENTIALS: "true",
     API_PREFIX: "/api/v1",
-    RESEND_API_KEY: "test-key"
-  }
+    RESEND_API_KEY: "test-key",
+  },
 }));
 
 jest.mock("bullmq", () => {
-    return {
-        Queue: jest.fn().mockImplementation(() => ({
-            on: jest.fn(),
-            add: jest.fn(),
-        })),
-        Worker: jest.fn().mockImplementation(() => ({
-            on: jest.fn(),
-            close: jest.fn(),
-        })),
-    };
+  return {
+    Queue: jest.fn().mockImplementation(() => ({
+      on: jest.fn(),
+      add: jest.fn(),
+    })),
+    Worker: jest.fn().mockImplementation(() => ({
+      on: jest.fn(),
+      close: jest.fn(),
+    })),
+  };
 });
 
 jest.mock("@lib/redis", () => require("./mocks/redis"));
@@ -47,6 +47,8 @@ describe("app.ts", () => {
     expect(res.body.openapi).toBeDefined();
     expect(res.body.info).toBeDefined();
     expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/crawl-sessions");
+    expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/user-guide-states");
+    expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/versions/{versionId}/generate-user-guide");
     expect(res.body.paths).toHaveProperty("/projects/{projectId}/target-applications/{appId}/crawl-schedules");
   });
 
@@ -68,10 +70,10 @@ describe("app.ts", () => {
       // Cors middleware typically sends a 500 when the origin callback throws an error
       expect(res.status).toBe(500);
     });
-    
+
     test("should allow requests with no origin (e.g., server-to-server)", async () => {
-        const res = await request(app).get("/health"); // No Origin header set
-        expect(res.status).toBe(200);
+      const res = await request(app).get("/health"); // No Origin header set
+      expect(res.status).toBe(200);
     });
   });
 });

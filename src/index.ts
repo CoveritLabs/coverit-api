@@ -7,7 +7,9 @@ import { createServer } from "http";
 import app from "./app";
 import prisma from "@lib/prisma";
 import redis from "@lib/redis";
+import { verifyNeo4jConnection } from "@lib/neo4j";
 import { env } from "@config/env";
+import { setupFlowEditorWebSockets } from "./ws/flowEditorBroker";
 import { setupManualSessionWebSockets } from "./ws/manualSessionBroker";
 
 async function startServer(): Promise<void> {
@@ -31,8 +33,19 @@ async function startServer(): Promise<void> {
     process.exit(1);
   }
 
+  console.info("Connecting to Neo4j...");
+  try {
+    await verifyNeo4jConnection();
+    console.info("Neo4j connected");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Neo4j connection error:", message);
+    process.exit(1);
+  }
+
   const server = createServer(app);
   setupManualSessionWebSockets(server);
+  setupFlowEditorWebSockets(server);
 
   server.listen(env.PORT, () => {
     console.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);

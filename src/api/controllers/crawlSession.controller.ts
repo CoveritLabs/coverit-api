@@ -24,6 +24,14 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
     const { projectId, appId, versionId } = AppVersionParamsSchema.parse(req.params);
     const body = CreateCrawlSessionRequestSchema.parse(req.body);
     const result = await crawlService.createSession(projectId, appId, versionId, getCurrentUserId(req), body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_session.created",
+      entityType: "crawl_session",
+      entityId: result.id,
+      message: "Created crawl session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.CREATED).json(result);
   } catch (e) {
     next(e);
@@ -44,6 +52,14 @@ export const deleteSession = async (req: Request, res: Response, next: NextFunct
   try {
     const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
     const { message } = await crawlService.deleteSession(projectId, appId, versionId, crawlSessionId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_session.deleted",
+      entityType: "crawl_session",
+      entityId: crawlSessionId,
+      message: "Deleted crawl session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.OK).json({ message });
   } catch (e) {
     next(e);
@@ -54,6 +70,14 @@ export const startSession = async (req: Request, res: Response, next: NextFuncti
   try {
     const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
     const { message } = await crawlService.startSession(projectId, appId, versionId, crawlSessionId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_session.started",
+      entityType: "crawl_session",
+      entityId: crawlSessionId,
+      message: "Started crawl session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.OK).json({ message });
   } catch (e) {
     next(e);
@@ -64,6 +88,14 @@ export const abortSession = async (req: Request, res: Response, next: NextFuncti
   try {
     const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
     const { message } = await crawlService.abortSession(projectId, appId, versionId, crawlSessionId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_session.aborted",
+      entityType: "crawl_session",
+      entityId: crawlSessionId,
+      message: "Aborted crawl session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.OK).json({ message });
   } catch (e) {
     next(e);
@@ -74,6 +106,14 @@ export const pauseSession = async (req: Request, res: Response, next: NextFuncti
   try {
     const { projectId, appId, versionId, crawlSessionId } = CrawlSessionParamsSchema.parse(req.params);
     const { message } = await crawlService.pauseSession(projectId, appId, versionId, crawlSessionId);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "crawl_session.paused",
+      entityType: "crawl_session",
+      entityId: crawlSessionId,
+      message: "Paused crawl session",
+      metadata: { applicationId: appId, versionId },
+    });
     res.status(StatusCodes.OK).json({ message });
   } catch (e) {
     next(e);

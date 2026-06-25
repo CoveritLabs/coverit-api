@@ -15,7 +15,7 @@ import { cacheKeys } from "@lib/cache";
 import { toPersistedCrawlConfig } from "@mappers/crawlSession.mapper";
 import { CrawlConfigSchema } from "@models/crawlSession";
 import { addManualSessionJob } from "@queues/crawl.queue";
-import { BadRequestError, NotFoundError, UnauthorizedError } from "@utils/errors";
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "@utils/errors";
 
 type TicketPayload = {
   sessionId: string;
@@ -101,6 +101,51 @@ export async function createManualSession(
       },
     });
     throw error;
+  }
+
+  return {
+    sessionId: session.id,
+    wsTicket: await issueTicket(session.id, userId),
+  };
+}
+
+export async function reattachManualSession(
+  projectId: string,
+  appId: string,
+  versionId: string,
+  sessionId: string,
+  userId: string,
+): Promise<ManualSessionConnectResponse> {
+  await requireTargetApplication(projectId, appId);
+  await requireApplicationVersion(appId, versionId);
+
+  const session = await prisma.crawlSession.findFirst({
+    where: {
+      id: sessionId,
+      appVersionId: versionId,
+    },
+    select: {
+      id: true,
+      status: true,
+      triggerType: true,
+    },
+  });
+
+  if (!session) {
+    throw new NotFoundError(MANUAL_SESSION_MESSAGES.SESSION_NOT_FOUND);
+  }
+
+  if (session.triggerType !== PrismaCrawlTriggerType.MANUAL) {
+    throw new ConflictError(MANUAL_SESSION_MESSAGES.SESSION_NOT_MANUAL);
+  }
+
+  if (
+    session.status !== PrismaCrawlStatus.NEW &&
+    session.status !== PrismaCrawlStatus.QUEUED &&
+    session.status !== PrismaCrawlStatus.RUNNING &&
+    session.status !== PrismaCrawlStatus.PAUSED
+  ) {
+    throw new ConflictError(MANUAL_SESSION_MESSAGES.SESSION_NOT_ACTIVE);
   }
 
   return {

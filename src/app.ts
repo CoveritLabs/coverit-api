@@ -12,7 +12,6 @@ import { swaggerSpec } from "@config/swagger";
 import authRoutes from "@api/routes/auth.routes";
 import oauthRoutes from "@api/routes/oauth.routes";
 import projectRoutes from "@api/routes/project.routes";
-import internalTestFlowRouter from "@api/routes/internalTestFlow.route";
 import internalScenarioReportsRoutes from "@api/routes/internalScenarioReports.routes";
 import internalNotificationsRoutes from "@api/routes/internalNotifications.routes";
 import regressionIngestRoutes from "@api/routes/regressionIngest.routes";
@@ -55,7 +54,6 @@ app.use(`${apiBase}/auth`, authRoutes);
 app.use(`${apiBase}/oauth`, oauthRoutes);
 app.use(`${apiBase}/regression`, regressionIngestRoutes);
 app.use(`${apiBase}/projects`, projectRoutes);
-app.use(`${apiBase}/internal`, internalTestFlowRouter);
 app.use(`${apiBase}/internal`, internalScenarioReportsRoutes);
 app.use(`${apiBase}/internal`, internalNotificationsRoutes);
 

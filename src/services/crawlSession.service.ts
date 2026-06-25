@@ -60,7 +60,7 @@ const mapSession = (session: DbCrawlSession): CrawlSessionData => ({
   errorMessage: session.error ?? undefined,
 });
 
-async function requireTargetApplication(projectId: string, appId: string) {
+export async function requireTargetApplication(projectId: string, appId: string) {
   const app = await prisma.targetApplication.findUnique({ where: { id: appId } });
   if (!app || app.projectId !== projectId) {
     throw new NotFoundError(CRAWL_SESSION_MESSAGES.APPLICATION_NOT_FOUND);
@@ -68,7 +68,7 @@ async function requireTargetApplication(projectId: string, appId: string) {
   return app;
 }
 
-async function requireApplicationVersion(appId: string, versionId: string) {
+export async function requireApplicationVersion(appId: string, versionId: string) {
   const version = await prisma.targetApplicationVersion.findFirst({
     where: { id: versionId, targetApplicationId: appId },
   });
@@ -253,10 +253,25 @@ export async function startSession(projectId: string, appId: string, versionId: 
   }
 
   if (session.status === PrismaCrawlStatus.PAUSED) {
-    await prisma.crawlSession.update({
-      where: { id: sessionId },
-      data: { status: PrismaCrawlStatus.RUNNING },
+    const resumed = await prisma.crawlSession.updateMany({
+      where: { id: sessionId, status: PrismaCrawlStatus.PAUSED },
+      data: { status: PrismaCrawlStatus.RUNNING, finishedAt: null, error: null },
     });
+
+    if (resumed.count !== 1) {
+      return { message: CRAWL_SESSION_MESSAGES.ALREADY_STARTED };
+    }
+
+    try {
+      await addCrawlJob(sessionId);
+    } catch (error) {
+      await prisma.crawlSession.updateMany({
+        where: { id: sessionId, status: PrismaCrawlStatus.RUNNING },
+        data: { status: PrismaCrawlStatus.PAUSED },
+      });
+      throw error;
+    }
+
     return { message: CRAWL_SESSION_MESSAGES.RESUMED };
   }
 

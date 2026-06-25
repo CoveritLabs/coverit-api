@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { env } from "@config/env";
-import { INTEGRATIONS_MESSAGES, REGRESSION_RUN_MESSAGES, SCENARIO_REPORT_MESSAGES } from "@constants/messages";
+import { INTEGRATIONS_MESSAGES, MANUAL_SESSION_MESSAGES, REGRESSION_RUN_MESSAGES, SCENARIO_REPORT_MESSAGES } from "@constants/messages";
 import prisma from "@lib/prisma";
 import { getIntegrationProvider } from "integrations/providers";
 import { mapIntegrationReportingConfig } from "@mappers/integrations.mapper";
@@ -22,17 +22,21 @@ import type {
   CreateScenarioIntegrationReportBody,
   CreateScenarioIntegrationReportResponse,
   InternalClaimScenarioReportBody,
+  InternalCreateManualBugReportBody,
   InternalPatchScenarioReportBody,
   InternalScenarioReportContextResponse,
 } from "@models/scenarioReports";
+import { enqueueManualBugReport } from "@queues/arq/docgenArq";
 import { artifactStorage } from "@services/artifactStorage.service";
 import { getValidJiraAccess } from "@services/integrations.service";
+import { recordProjectActivities } from "@services/projectActivity.service";
 import { getUser } from "@services/user.service";
 import { BadRequestError, NotFoundError, UnauthorizedError } from "@utils/errors";
 import { ARTIFACT_STORAGE } from "@constants/artifactStorage";
 import { notifyScenarioReportUpdated } from "@services/notifications.service";
 
 const MAX_REPORT_ATTEMPTS = 5;
+const MANUAL_BUG_RUN_NAME = "Manual Bug Reports";
 
 export function assertInternalServiceToken(token?: string | string[]): void {
   const value = Array.isArray(token) ? token[0] : token;
@@ -123,6 +127,173 @@ export async function createScenarioReport(
   return { report: mapScenarioIntegrationReport(report) };
 }
 
+export async function createManualBugReport(
+  body: InternalCreateManualBugReportBody,
+): Promise<CreateScenarioIntegrationReportResponse & { jobId: string }> {
+  const providerConfig = getIntegrationProvider(body.provider);
+  const storedProvider = providerConfig.storedProvider;
+
+  const session = await (prisma as any).crawlSession.findUnique({
+    where: { id: body.sessionId },
+    include: {
+      creator: { select: { id: true, email: true } },
+      appVersion: {
+        select: {
+          id: true,
+          targetApplicationId: true,
+          targetApplication: { select: { id: true, projectId: true } },
+        },
+      },
+    },
+  });
+  if (!session) throw new NotFoundError(MANUAL_SESSION_MESSAGES.SESSION_NOT_FOUND);
+
+  const app = session.appVersion?.targetApplication;
+  if (!app?.id || !app.projectId) throw new NotFoundError(REGRESSION_RUN_MESSAGES.APPLICATION_MISMATCH);
+
+  const integration = await (prisma as any).projectIntegration.findUnique({
+    where: { projectId_provider: { projectId: app.projectId, provider: storedProvider } },
+  });
+  if (!integration) throw new NotFoundError(INTEGRATIONS_MESSAGES.JIRA_NOT_CONNECTED);
+
+  const reportingConfig = mapIntegrationReportingConfig(providerConfig.apiProvider, integration.reportingConfig);
+  if (reportingConfig.case === undefined || !reportingConfig.value.enabled) {
+    throw new BadRequestError(SCENARIO_REPORT_MESSAGES.REPORTING_NOT_CONFIGURED);
+  }
+
+  const now = new Date();
+  const publicRunId = `manual-bug-${body.sessionId}`;
+  const scenarioKey = `manual-bug:${body.flowId}`;
+  const bugReport = parseManualBugSummary(body.summary);
+  const title = bugReport.title;
+  const description = manualBugDescription(body, bugReport.description);
+  const runName = `${MANUAL_BUG_RUN_NAME} ${body.sessionId.slice(0, 8)}`;
+
+  const report = await (prisma as any).$transaction(async (tx: any) => {
+    const run = await tx.regressionRun.upsert({
+      where: { targetApplicationId_runId: { targetApplicationId: app.id, runId: publicRunId } },
+      create: {
+        targetApplicationId: app.id,
+        versionId: session.appVersion.id,
+        runId: publicRunId,
+        name: runName,
+        status: "FAILED",
+        startedAt: now,
+        finishedAt: now,
+        durationMs: 0,
+        failedCount: 1,
+        summary: { source: "manual_bug_report", sessionId: body.sessionId },
+      },
+      update: {
+        name: runName,
+        status: "FAILED",
+        finishedAt: now,
+        failedCount: 1,
+        summary: { source: "manual_bug_report", sessionId: body.sessionId },
+      },
+    });
+
+    const scenario = await tx.regressionScenario.upsert({
+      where: { runDbId_scenarioKey: { runDbId: run.id, scenarioKey } },
+      create: {
+        runDbId: run.id,
+        scenarioKey,
+        scenarioName: title,
+        title,
+        status: "FAILED",
+        startedAt: now,
+        finishedAt: now,
+        durationMs: 0,
+        failedCount: 1,
+      },
+      update: {
+        scenarioName: title,
+        title,
+        status: "FAILED",
+        finishedAt: now,
+        failedCount: 1,
+      },
+    });
+
+    const existing = await tx.scenarioIntegrationReport.findUnique({
+      where: { scenarioId_provider: { scenarioId: scenario.id, provider: storedProvider } },
+    });
+
+    if (existing) {
+      return tx.scenarioIntegrationReport.update({
+        where: { id: existing.id },
+        data: {
+          status: "PENDING",
+          title,
+          description,
+          reporterUserId: session.creatorUserId,
+          reporterEmail: session.creator?.email ?? "unknown",
+          artifactIds: [],
+          attachedArtifactIds: [],
+          lastError: null,
+          providerData: {
+            ...(typeof existing.providerData === "object" && existing.providerData ? existing.providerData : {}),
+            manualBug: manualBugProviderData(body),
+          },
+        },
+      });
+    }
+
+    return tx.scenarioIntegrationReport.create({
+      data: {
+        projectId: app.projectId,
+        runDbId: run.id,
+        scenarioId: scenario.id,
+        provider: storedProvider,
+        status: "PENDING",
+        title,
+        description,
+        reporterUserId: session.creatorUserId,
+        reporterEmail: session.creator?.email ?? "unknown",
+        artifactIds: [],
+        providerData: { manualBug: manualBugProviderData(body) },
+      },
+    });
+  });
+
+  const jobId = await enqueueManualBugReport({
+    report_id: report.id,
+    provider: body.provider,
+    session_id: body.sessionId,
+    flow_id: body.flowId,
+    checkpoint_hash: body.checkpointHash,
+    transition_ids: body.transitionIds,
+    summary: title,
+    severity: body.severity,
+    current_url: body.currentUrl,
+    recorded_events: body.recordedEvents,
+  });
+
+  await recordProjectActivities(
+    [
+      {
+        projectId: app.projectId,
+        eventType: "manual_bug_report.queued",
+        entityType: "scenario_integration_report",
+        entityId: report.id,
+        message: "Queued manual bug report",
+        metadata: {
+          applicationId: app.id,
+          versionId: session.appVersion.id,
+          sessionId: body.sessionId,
+          flowId: body.flowId,
+          provider: body.provider,
+          severity: body.severity,
+          jobId,
+        },
+      },
+    ],
+    session.creatorUserId,
+  );
+
+  return { report: mapScenarioIntegrationReport(report), jobId };
+}
+
 export async function claimScenarioReport(body: InternalClaimScenarioReportBody): Promise<CreateScenarioIntegrationReportResponse | null> {
   const storedProvider = body.provider ? toStoredReportProvider(body.provider) : undefined;
   const where: any = {
@@ -133,9 +304,15 @@ export async function claimScenarioReport(body: InternalClaimScenarioReportBody)
 
   const candidate = body.reportId
     ? await (prisma as any).scenarioIntegrationReport.findFirst({ where: { ...where, id: body.reportId } })
-    : await (prisma as any).scenarioIntegrationReport.findFirst({ where, orderBy: { createdAt: "asc" } });
+    : (
+        await (prisma as any).scenarioIntegrationReport.findMany({
+          where,
+          orderBy: { createdAt: "asc" },
+          take: MAX_REPORT_ATTEMPTS * 5,
+        })
+      ).find((report: any) => !isManualBugReport(report));
 
-  if (!candidate) return null;
+  if (!candidate || isManualBugReport(candidate)) return null;
 
   const updated = await (prisma as any).scenarioIntegrationReport.updateMany({
     where: {
@@ -175,6 +352,10 @@ export async function getScenarioReportContext(reportId: string): Promise<Intern
     where: { id: { in: report.artifactIds ?? [] }, runDbId: report.runDbId },
     orderBy: { createdAt: "asc" },
   });
+  const run = await (prisma as any).regressionRun.findUnique({
+    where: { id: report.runDbId },
+    include: { targetApplication: { select: { name: true } } },
+  });
 
   return {
     report: mapScenarioIntegrationReport(report),
@@ -193,6 +374,7 @@ export async function getScenarioReportContext(reportId: string): Promise<Intern
       sizeBytes: artifact.sizeBytes == null ? undefined : Number(artifact.sizeBytes),
     })),
     structuredDescription: mapStructuredScenarioReportDescription(report),
+    applicationName: run?.targetApplication?.name,
   };
 }
 
@@ -216,17 +398,17 @@ export async function downloadScenarioReportArtifact(
   };
 }
 
-export async function patchScenarioReport(
-  reportId: string,
-  body: InternalPatchScenarioReportBody,
-): Promise<CreateScenarioIntegrationReportResponse> {
+export async function patchScenarioReport(reportId: string, body: InternalPatchScenarioReportBody): Promise<CreateScenarioIntegrationReportResponse> {
   const data: Record<string, any> = {};
   if (body.status) data.status = toDbReportStatus(body.status);
   if (body.externalIssueKey !== undefined) data.externalIssueKey = body.externalIssueKey;
   if (body.externalIssueUrl !== undefined) data.externalIssueUrl = body.externalIssueUrl;
   if (body.attachedArtifactIds !== undefined) data.attachedArtifactIds = uniqueStrings(body.attachedArtifactIds);
   if (body.lastError !== undefined) data.lastError = body.lastError;
-  if (body.providerData !== undefined) data.providerData = body.providerData as any;
+  if (body.providerData !== undefined) {
+    const existing = await findReport(reportId);
+    data.providerData = mergeProviderData(existing.providerData, body.providerData);
+  }
 
   const report = await (prisma as any).scenarioIntegrationReport.update({
     where: { id: reportId },
@@ -250,4 +432,52 @@ async function assertScenarioArtifacts(runDbId: string, scenario: any, artifactI
   if (!artifactIds.every((artifactId) => selectableIds.has(artifactId))) {
     throw new BadRequestError(SCENARIO_REPORT_MESSAGES.ARTIFACTS_NOT_FOUND);
   }
+}
+
+function parseManualBugSummary(summary: string): { title: string; description: string } {
+  const [titleLine = "", ...descriptionLines] = summary.trim().split(/\r?\n/);
+  const title = titleLine.trim() || "Untitled bug report";
+  const description = descriptionLines.join("\n").trim();
+  return { title, description };
+}
+
+function manualBugDescription(body: InternalCreateManualBugReportBody, description: string): string {
+  const lines = [
+    description || parseManualBugSummary(body.summary).title,
+    "",
+    `Severity: ${body.severity}`,
+    ...(body.currentUrl ? [`Current URL: ${body.currentUrl}`] : []),
+    `Flow ID: ${body.flowId}`,
+  ];
+  return lines.join("\n").trim();
+}
+
+function manualBugProviderData(body: InternalCreateManualBugReportBody): Record<string, unknown> {
+  return {
+    sessionId: body.sessionId,
+    flowId: body.flowId,
+    checkpointHash: body.checkpointHash,
+    transitionIds: body.transitionIds,
+    severity: body.severity,
+    currentUrl: body.currentUrl,
+  };
+}
+
+function isManualBugReport(report: any): boolean {
+  const providerData = report?.providerData;
+  return !!(
+    providerData &&
+    typeof providerData === "object" &&
+    !Array.isArray(providerData) &&
+    "manualBug" in providerData
+  );
+}
+
+function mergeProviderData(existing: unknown, patch: unknown): unknown {
+  if (!isPlainRecord(existing) || !isPlainRecord(patch)) return patch;
+  return { ...existing, ...patch };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }

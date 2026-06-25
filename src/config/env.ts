@@ -7,6 +7,9 @@ export const env = {
   PORT: parseInt(process.env.PORT ?? "3000", 10),
   DATABASE_URL: process.env.DATABASE_URL ?? "",
   REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+  NEO4J_URI: process.env.NEO4J_URI ?? process.env.NEO4J_URL ?? "bolt://localhost:7687",
+  NEO4J_USER: process.env.NEO4J_USER ?? process.env.NEO4J_USERNAME ?? "neo4j",
+  NEO4J_PASSWORD: process.env.NEO4J_PASSWORD ?? "",
   CORS_ORIGINS: (process.env.CORS_ORIGINS ?? "http://localhost:5173").split(","),
   CORS_CREDENTIALS: process.env.CORS_CREDENTIALS ?? "true",
   JWT_SECRET: process.env.JWT_SECRET ?? "",
@@ -50,6 +53,10 @@ export const env = {
   DAGSHUB_TOKEN: process.env.DAGSHUB_TOKEN ?? "",
   DAGSHUB_ARTIFACT_PREFIX: process.env.DAGSHUB_ARTIFACT_PREFIX ?? "coverit-regression-artifacts",
   REGRESSION_ARTIFACT_MAX_BYTES: parseInt(process.env.REGRESSION_ARTIFACT_MAX_BYTES ?? "104857600", 10),
+
+  // Queues
+  CRAWL_ARQ_QUEUE_NAME: process.env.CRAWL_ARQ_QUEUE_NAME ?? "arq:crawl_queue",
+  MANUAL_ARQ_QUEUE_NAME: process.env.MANUAL_ARQ_QUEUE_NAME ?? "arq:manual_queue",
 } as const;
 
 console.info("Loaded environment variables:", {
@@ -57,6 +64,9 @@ console.info("Loaded environment variables:", {
   PORT: env.PORT,
   DATABASE_URL: env.DATABASE_URL ? "****" : "(not set)",
   REDIS_URL: env.REDIS_URL ? "****" : "(not set)",
+  NEO4J_URI: env.NEO4J_URI,
+  NEO4J_USER: env.NEO4J_USER ? "****" : "(not set)",
+  NEO4J_PASSWORD: env.NEO4J_PASSWORD ? "****" : "(not set)",
   CORS_ORIGINS: env.CORS_ORIGINS,
   CORS_CREDENTIALS: env.CORS_CREDENTIALS,
   JWT_SECRET: env.JWT_SECRET ? "****" : "(not set)",
@@ -90,4 +100,6 @@ console.info("Loaded environment variables:", {
   DAGSHUB_TOKEN: env.DAGSHUB_TOKEN ? "****" : "(not set)",
   DAGSHUB_ARTIFACT_PREFIX: env.DAGSHUB_ARTIFACT_PREFIX,
   REGRESSION_ARTIFACT_MAX_BYTES: env.REGRESSION_ARTIFACT_MAX_BYTES,
+  CRAWL_ARQ_QUEUE_NAME: env.CRAWL_ARQ_QUEUE_NAME,
+  MANUAL_ARQ_QUEUE_NAME: env.MANUAL_ARQ_QUEUE_NAME,
 });

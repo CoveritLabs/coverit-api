@@ -45,17 +45,37 @@ describe("crawlSchedule.service", () => {
       regressionCodebaseId: "cb1",
       crawlConfig: {
         maxStates: 10,
-        maxDepth: 3,
-        includeUrlPatterns: [],
-        excludeUrlPatterns: [],
-        enableSemanticDecisions: false,
         timeoutSeconds: 60,
+        generateTestFlows: true,
+        generateTestCode: true,
+        testFlowGeneration: {
+          maxNumOfTf: 12,
+        },
+        crawlerSettings: {
+          maxElementsPerState: 50,
+          maxActionRepeatsPerUrl: 10,
+          useSemanticDiversity: false,
+        },
       },
     });
 
     expect(mockPrisma.crawlSchedule.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         creatorUserId: "creator-1",
+        crawlConfig: expect.objectContaining({
+          maxStates: 10,
+          timeoutSeconds: 60,
+          generateTestFlows: true,
+          generateTestCode: true,
+          testFlowGeneration: expect.objectContaining({
+            max_num_of_tf: 12,
+          }),
+          crawlerSettings: expect.objectContaining({
+            max_elements_per_state: 50,
+            max_action_repeats_per_url: 10,
+            use_semantic_diversity: false,
+          }),
+        }),
       }),
     }));
   });

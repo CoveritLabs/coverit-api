@@ -5,7 +5,7 @@
 import prisma from "@lib/prisma";
 import { CRAWL_SCHEDULE_MESSAGES, REGRESSION_CODEBASE_MESSAGES, TARGET_APPLICATION_MESSAGES } from "@constants/messages";
 import { BadRequestError, NotFoundError } from "@utils/errors";
-import { toPersistedCrawlConfig, toPersistedCodegenConfig } from "@mappers/crawlSession.mapper";
+import { fromPersistedCrawlConfig, toPersistedCrawlConfig, toPersistedCodegenConfig } from "@mappers/crawlSession.mapper";
 import { DEFAULT_CRAWL_CONFIG } from "@constants/crawlConfig";
 import { toIso } from "@utils/date";
 import type { MessageResponse } from "@models/common";
@@ -33,7 +33,7 @@ const mapSchedule = (schedule: Awaited<ReturnType<typeof prisma.crawlSchedule.fi
   catchUp: schedule.catchUp,
 
   crawlConfig: (() => {
-    const parsed = CrawlConfigSchema.safeParse(schedule.crawlConfig);
+    const parsed = CrawlConfigSchema.safeParse(fromPersistedCrawlConfig(schedule.crawlConfig, { ...DEFAULT_CRAWL_CONFIG }));
     return parsed.success ? parsed.data : { ...DEFAULT_CRAWL_CONFIG };
   })(),
 
@@ -194,7 +194,7 @@ export async function updateSchedule(
     if (input.crawlConfig) {
       return CrawlConfigSchema.parse(input.crawlConfig);
     }
-    const parsed = CrawlConfigSchema.safeParse(schedule.crawlConfig ?? { ...DEFAULT_CRAWL_CONFIG });
+    const parsed = CrawlConfigSchema.safeParse(fromPersistedCrawlConfig(schedule.crawlConfig, { ...DEFAULT_CRAWL_CONFIG }));
     return parsed.success ? parsed.data : { ...DEFAULT_CRAWL_CONFIG };
   })();
   const persistedConfig = toPersistedCrawlConfig(crawlConfig);

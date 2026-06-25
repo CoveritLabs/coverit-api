@@ -5,3 +5,7 @@
 export function toIso(value: Date | null): string | undefined {
   return value ? value.toISOString() : undefined;
 }
+
+export function nowMs(): number {
+  return Date.now();
+}

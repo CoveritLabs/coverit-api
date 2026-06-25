@@ -8,6 +8,7 @@ import { getCurrentUserId } from "@api/middlewares/requireAuth";
 import {
   CreateScenarioIntegrationReportBodySchema,
   InternalClaimScenarioReportBodySchema,
+  InternalCreateManualBugReportBodySchema,
   InternalPatchScenarioReportBodySchema,
 } from "@models/scenarioReports";
 import * as scenarioReportsService from "@services/scenarioReports.service";
@@ -18,6 +19,14 @@ export async function createScenarioReport(req: Request, res: Response, next: Ne
     const userId = getCurrentUserId(req);
     const body = CreateScenarioIntegrationReportBodySchema.parse(req.body);
     const response = await scenarioReportsService.createScenarioReport(projectId, appId, runId, scenarioId, provider, userId, body);
+    req.recordProjectActivity?.({
+      projectId,
+      eventType: "scenario_report.created",
+      entityType: "scenario_integration_report",
+      entityId: response.report.id,
+      message: `Created ${provider} scenario report`,
+      metadata: { applicationId: appId, runId, scenarioId, provider },
+    });
     res.status(StatusCodes.ACCEPTED).json(response);
   } catch (err) {
     next(err);
@@ -34,6 +43,17 @@ export async function claimScenarioReport(req: Request, res: Response, next: Nex
       return;
     }
     res.status(StatusCodes.OK).json(response);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createManualBugReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    scenarioReportsService.assertInternalServiceToken(req.headers["x-coverit-internal-token"]);
+    const body = InternalCreateManualBugReportBodySchema.parse(req.body);
+    const response = await scenarioReportsService.createManualBugReport(body);
+    res.status(StatusCodes.ACCEPTED).json(response);
   } catch (err) {
     next(err);
   }

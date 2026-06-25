@@ -9,22 +9,32 @@ jest.mock("@services/artifactStorage.service", () => ({ artifactStorage: { read:
 jest.mock("@services/notifications.service", () => ({
   notifyScenarioReportUpdated: jest.fn(),
 }));
+jest.mock("@queues/arq/docgenArq", () => ({
+  enqueueManualBugReport: jest.fn(),
+}));
+jest.mock("@services/projectActivity.service", () => ({
+  recordProjectActivities: jest.fn(),
+}));
 
 import prisma from "@lib/prisma";
 import { SCENARIO_REPORT_MESSAGES } from "@constants/messages";
 import { getUser } from "@services/user.service";
 import { getValidJiraAccess } from "@services/integrations.service";
 import { notifyScenarioReportUpdated } from "@services/notifications.service";
+import { enqueueManualBugReport } from "@queues/arq/docgenArq";
+import { recordProjectActivities } from "@services/projectActivity.service";
 import * as svc from "@services/scenarioReports.service";
 
 const mockPrisma = prisma as any;
 const mockGetUser = getUser as jest.Mock;
 const mockGetValidJiraAccess = getValidJiraAccess as jest.Mock;
 const mockNotifyScenarioReportUpdated = notifyScenarioReportUpdated as jest.Mock;
+const mockEnqueueManualBugReport = enqueueManualBugReport as jest.Mock;
+const mockRecordProjectActivities = recordProjectActivities as jest.Mock;
 
 const now = new Date("2026-06-19T12:00:00.000Z");
 const app = { id: "app1", projectId: "p1" };
-const run = { id: "run-db-1", runId: "run-1", targetApplicationId: "app1" };
+const run = { id: "run-db-1", runId: "run-1", targetApplicationId: "app1", targetApplication: { name: "Shop" } };
 const failedScenario = {
   id: "scenario-1",
   runDbId: "run-db-1",
@@ -93,7 +103,21 @@ describe("scenarioReports.service", () => {
     mockPrisma.projectIntegration.findUnique.mockResolvedValue(integration);
     mockPrisma.regressionArtifact.findMany.mockResolvedValue([uploadedArtifact]);
     mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(null);
+    mockPrisma.scenarioIntegrationReport.findMany.mockResolvedValue([]);
     mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(report());
+    mockPrisma.regressionRun.upsert.mockResolvedValue({ ...run, id: "manual-run-db-1" });
+    mockPrisma.regressionScenario.upsert.mockResolvedValue({ ...failedScenario, id: "manual-scenario-1", runDbId: "manual-run-db-1" });
+    mockPrisma.crawlSession.findUnique.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      creatorUserId: "u1",
+      creator: { id: "u1", email: "user@example.com" },
+      appVersion: {
+        id: "version-1",
+        targetApplicationId: "app1",
+        targetApplication: { id: "app1", projectId: "p1" },
+      },
+    });
+    mockEnqueueManualBugReport.mockResolvedValue("docgen:manual-bug:job-1");
     mockGetUser.mockResolvedValue({ id: "u1", email: "user@example.com", name: "User" });
     mockGetValidJiraAccess.mockResolvedValue({
       provider: "jira",
@@ -235,6 +259,7 @@ describe("scenarioReports.service", () => {
         { key: "source", type: "metadata", title: "Source", text: "Generated automatically by CoverIt" },
       ],
     });
+    expect(response.applicationName).toBe("Shop");
   });
 
   test("delegates notification handling after patching a report", async () => {
@@ -248,5 +273,177 @@ describe("scenarioReports.service", () => {
     await svc.patchScenarioReport("report-1", { status: "created", externalIssueKey: "COV-1" });
 
     expect(mockNotifyScenarioReportUpdated).toHaveBeenCalledWith(updatedReport, { terminalFailureAttemptCount: 5 });
+  });
+
+  test("preserves manual bug provider data when patching provider issue fields", async () => {
+    const existingReport = report({
+      providerData: { manualBug: { flowId: "flow-1" } },
+    });
+    mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(existingReport);
+    mockPrisma.scenarioIntegrationReport.update.mockResolvedValue(
+      report({ providerData: { manualBug: { flowId: "flow-1" }, jiraIssueId: "10001" } }),
+    );
+
+    await svc.patchScenarioReport("report-1", { providerData: { jiraIssueId: "10001" } });
+
+    expect(mockPrisma.scenarioIntegrationReport.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          providerData: { manualBug: { flowId: "flow-1" }, jiraIssueId: "10001" },
+        }),
+      }),
+    );
+  });
+
+  test("creates a manual bug report before enqueueing docgen", async () => {
+    mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(
+      report({
+        id: "manual-report-1",
+        runDbId: "manual-run-db-1",
+        scenarioId: "manual-scenario-1",
+        artifactIds: [],
+      }),
+    );
+
+    const response = await svc.createManualBugReport({
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      flowId: "22222222-2222-4222-8222-222222222222",
+      checkpointHash: "state-1",
+      transitionIds: ["transition-1"],
+      summary: "Checkout fails",
+      severity: "high",
+      currentUrl: "https://app.test/cart",
+      recordedEvents: [{ action: "click", selector: "#checkout" }],
+      provider: "jira",
+    });
+
+    expect(mockPrisma.regressionRun.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { targetApplicationId_runId: { targetApplicationId: "app1", runId: "manual-bug-11111111-1111-4111-8111-111111111111" } },
+      }),
+    );
+    expect(mockPrisma.scenarioIntegrationReport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          provider: "JIRA",
+          status: "PENDING",
+          description: "Checkout fails\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
+          artifactIds: [],
+          providerData: expect.objectContaining({
+            manualBug: expect.objectContaining({ flowId: "22222222-2222-4222-8222-222222222222" }),
+          }),
+        }),
+      }),
+    );
+    expect(mockPrisma.scenarioIntegrationReport.create.mock.calls[0][0].data.description).not.toContain("Recorded events:");
+    expect(mockEnqueueManualBugReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        report_id: "manual-report-1",
+        provider: "jira",
+        session_id: "11111111-1111-4111-8111-111111111111",
+        flow_id: "22222222-2222-4222-8222-222222222222",
+        transition_ids: ["transition-1"],
+      }),
+    );
+    expect(mockRecordProjectActivities).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          projectId: "p1",
+          eventType: "manual_bug_report.queued",
+          entityType: "scenario_integration_report",
+          entityId: "manual-report-1",
+          metadata: expect.objectContaining({
+            applicationId: "app1",
+            versionId: "version-1",
+            sessionId: "11111111-1111-4111-8111-111111111111",
+            flowId: "22222222-2222-4222-8222-222222222222",
+            jobId: "docgen:manual-bug:job-1",
+          }),
+        }),
+      ],
+      "u1",
+    );
+    expect(response).toMatchObject({ report: { id: "manual-report-1" }, jobId: "docgen:manual-bug:job-1" });
+  });
+
+  test("uses first manual bug summary line as title and remaining lines as description", async () => {
+    mockPrisma.scenarioIntegrationReport.create.mockResolvedValue(
+      report({
+        id: "manual-report-1",
+        title: "Checkout fails",
+        description:
+          "Button never submits\nUser remains on cart\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
+        runDbId: "manual-run-db-1",
+        scenarioId: "manual-scenario-1",
+        artifactIds: [],
+      }),
+    );
+
+    await svc.createManualBugReport({
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      flowId: "22222222-2222-4222-8222-222222222222",
+      checkpointHash: "state-1",
+      transitionIds: ["transition-1"],
+      summary: "Checkout fails\nButton never submits\nUser remains on cart",
+      severity: "high",
+      currentUrl: "https://app.test/cart",
+      recordedEvents: [],
+      provider: "jira",
+    });
+
+    expect(mockPrisma.regressionScenario.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          scenarioName: "Checkout fails",
+          title: "Checkout fails",
+        }),
+        update: expect.objectContaining({
+          scenarioName: "Checkout fails",
+          title: "Checkout fails",
+        }),
+      }),
+    );
+    expect(mockPrisma.scenarioIntegrationReport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Checkout fails",
+          description:
+            "Button never submits\nUser remains on cart\n\nSeverity: high\nCurrent URL: https://app.test/cart\nFlow ID: 22222222-2222-4222-8222-222222222222",
+        }),
+      }),
+    );
+    expect(mockEnqueueManualBugReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: "Checkout fails",
+      }),
+    );
+  });
+
+  test("generic scenario report claim skips manual bug reports", async () => {
+    mockPrisma.scenarioIntegrationReport.findMany.mockResolvedValue([
+      report({ id: "manual-report-1", providerData: { manualBug: { flowId: "flow-1" } } }),
+      report({ id: "regular-report-1", providerData: null }),
+    ]);
+    mockPrisma.scenarioIntegrationReport.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.scenarioIntegrationReport.findUnique.mockResolvedValue(report({ id: "regular-report-1" }));
+
+    const response = await svc.claimScenarioReport({ provider: "jira" });
+
+    expect(mockPrisma.scenarioIntegrationReport.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "regular-report-1" }),
+      }),
+    );
+    expect(response?.report.id).toBe("regular-report-1");
+  });
+
+  test("generic scenario report claim rejects explicit manual bug report ids", async () => {
+    mockPrisma.scenarioIntegrationReport.findFirst.mockResolvedValue(
+      report({ id: "manual-report-1", providerData: { manualBug: { flowId: "flow-1" } } }),
+    );
+
+    await expect(svc.claimScenarioReport({ reportId: "manual-report-1", provider: "jira" })).resolves.toBeNull();
+
+    expect(mockPrisma.scenarioIntegrationReport.updateMany).not.toHaveBeenCalled();
   });
 });
