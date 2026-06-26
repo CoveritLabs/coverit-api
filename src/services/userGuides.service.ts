@@ -12,7 +12,7 @@ import type {
   UserGuideStatesResponse,
 } from "@models/userGuides";
 import { docgenArqConfig, enqueueUserGuidesGeneration } from "@queues/arq/docgenArq";
-import { requireApplicationVersion, requireTargetApplication } from "@services/crawlSession.service";
+import { requireTargetApplication } from "@services/crawlSession.service";
 import { BadRequestError } from "@utils/errors";
 
 const USER_GUIDES_RESULT_TIMEOUT_MS = 30_000;
@@ -94,7 +94,6 @@ async function waitForArqResult(jobId: string, timeoutMs = USER_GUIDES_RESULT_TI
 
 export async function getUserGuideStates(projectId: string, appId: string, versionId: string): Promise<UserGuideStatesResponse> {
   await requireTargetApplication(projectId, appId);
-  await requireApplicationVersion(appId, versionId);
 
   const neo4jSession = getNeo4jReadSession();
 
